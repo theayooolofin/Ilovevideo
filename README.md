@@ -1,16 +1,54 @@
-# React + Vite
+# iLoveVideo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser-based media utility tool built with React + FFmpeg.wasm.
 
-Currently, two official plugins are available:
+Current live tools:
+- Optimize Media (video + image compression presets for WhatsApp, Instagram Reel, TikTok)
+- Resize for Reels/TikTok/WhatsApp (video + image)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+All processing happens in the browser. No backend required.
 
-## React Compiler
+## Local Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+## Production Build
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run build
+```
+
+The build output is generated in `dist/`.
+
+## Deploy to Hostinger (`ilovevideo.fun`)
+
+This project is a static Vite app, so deploy only the built `dist` contents.
+
+1. Build locally:
+
+```bash
+npm install
+npm run build
+```
+
+2. Upload to Hostinger:
+- Open Hostinger hPanel
+- Go to `Files` -> `File Manager` -> `public_html`
+- Back up old site files if needed
+- Delete old deployed app files in `public_html`
+- Upload everything inside `dist/` (not the `dist` folder itself)
+
+3. Confirm required files in `public_html`:
+- `index.html`
+- `assets/...`
+- `.htaccess` (copied from `public/.htaccess` into build output automatically)
+
+4. Open `https://ilovevideo.fun` and hard refresh (`Ctrl+F5`).
+
+## Notes
+
+- `.htaccess` enables SPA fallback and cache headers on Apache hosting.
+- If Cloudflare/CDN is enabled, purge cache after deployment.
