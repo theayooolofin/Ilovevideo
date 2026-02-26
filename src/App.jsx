@@ -222,6 +222,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
   const [result, setResult] = useState(null)
+  const [isDropActive, setIsDropActive] = useState(false)
 
   const ffmpegRef = useRef(new FFmpeg())
   const loadPromiseRef = useRef(null)
@@ -292,6 +293,7 @@ function App() {
     setSelectedFile(null)
     setErrorMessage('')
     setProgress(0)
+    setIsDropActive(false)
     clearResult()
     if (selectedTool === 'compress') {
       setStatusMessage(
@@ -347,9 +349,7 @@ function App() {
     return ''
   }
 
-  const handleFileChange = (event) => {
-    const [file] = event.target.files || []
-    if (!file) return
+  const handleIncomingFile = (file) => {
     const fileError = validationError(file)
     if (fileError) {
       setErrorMessage(fileError)
@@ -360,6 +360,29 @@ function App() {
     setProgress(0)
     clearResult()
     setStatusMessage(`Selected: ${file.name}`)
+  }
+
+  const handleFileChange = (event) => {
+    const [file] = event.target.files || []
+    if (file) handleIncomingFile(file)
+    event.target.value = ''
+  }
+
+  const handleDragOver = (event) => {
+    event.preventDefault()
+    setIsDropActive(true)
+  }
+
+  const handleDragLeave = (event) => {
+    event.preventDefault()
+    setIsDropActive(false)
+  }
+
+  const handleDrop = (event) => {
+    event.preventDefault()
+    setIsDropActive(false)
+    const [file] = event.dataTransfer?.files || []
+    if (file) handleIncomingFile(file)
   }
 
   const runVideoJob = async ({
@@ -617,12 +640,14 @@ function App() {
     await handleResizeImage()
   }
 
+  const goToCompressTool = () => {
+    setSelectedTool('compress')
+    document.getElementById('tool-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  const resultCardTone = 'output-card text-slate-800'
-  const progressTone = 'progress-fill'
-  const actionTone = 'primary-btn'
   const activeProfile = isCompressTool
     ? `${compressionPreset.label} ${compressMediaType} optimization`
     : `${resizePreset.label} (${resizePreset.width}x${resizePreset.height}) ${resizeMediaType} resize | ${resizeFrame.label} | ${resizeQuality.label}`
@@ -632,99 +657,132 @@ function App() {
       : isEngineReady
         ? 'Loaded and ready'
         : 'Loads on first video operation'
+  const modeLabel = isCompressTool
+    ? compressMediaType === 'video'
+      ? 'Video File'
+      : 'Image File'
+    : resizeMediaType === 'video'
+      ? 'Video File'
+      : 'Image File'
+  const modeHint = isCompressTool
+    ? compressMediaType === 'video'
+      ? 'Supports MP4, MOV, AVI and more'
+      : 'Supports JPG, PNG, WEBP and more'
+    : resizeMediaType === 'video'
+      ? 'Supports MP4, MOV, AVI and more'
+      : 'Supports JPG, PNG, WEBP and more'
 
   return (
-    <main className="min-h-screen px-4 py-10 font-body text-slate-900">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <header className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-500 text-white shadow-lg shadow-blue-200/80">
-            <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14" />
-              <rect x="3" y="6" width="12" height="12" rx="2" />
-            </svg>
-          </div>
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-slate-900">iLoveVideo</h1>
-          <p className="mt-2 text-slate-600">Compress and resize media directly in your browser.</p>
-        </header>
+    <main className="site-shell font-body text-slate-900">
+      <nav className="top-nav">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+          <p className="text-2xl font-extrabold tracking-tight">
+            <span className="text-[#111827]">iLove</span>
+            <span className="text-[#2563EB]">Video</span>
+          </p>
+          <button type="button" className="brand-cta text-sm" onClick={goToCompressTool}>
+            Compress Video Free →
+          </button>
+        </div>
+      </nav>
 
-        <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {TOOL_CARDS.map((tool) => {
-            const isActive = selectedTool === tool.id
-            return (
-              <button
-                key={tool.id}
-                type="button"
-                onClick={() => setSelectedTool(tool.id)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                  isActive
-                    ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
-                }`}
-              >
-                {tool.name}
-                {!tool.available && ' (Soon)'}
-              </button>
-            )
-          })}
+      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 md:py-10">
+        <section className="hero-card px-6 py-8 text-center sm:px-10 md:py-10">
+          <p className="badge-pill">🎬 100% Free · No Sign-Up · Browser-Based</p>
+          <h1 className="hero-title mt-4 text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl">
+            Do more with your videos. Free. Fast. Private.
+          </h1>
+          <p className="mx-auto mt-4 max-w-3xl text-base text-slate-600 md:text-lg">
+            Compress, resize, and optimize videos and images for WhatsApp, TikTok and Instagram Reels — all inside
+            your browser.
+          </p>
+          <p className="mt-4 text-sm font-semibold text-blue-700">🔒 Your files never leave your device.</p>
         </section>
 
-        <section className="soft-card rounded-2xl p-5 sm:p-6">
+        <section className="tabs-shell overflow-x-auto p-1">
+          <div className="inline-flex min-w-max items-center gap-1">
+            {TOOL_CARDS.map((tool) => {
+              const isActive = selectedTool === tool.id
+              const isSoon = !tool.available
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isSoon) setSelectedTool(tool.id)
+                  }}
+                  disabled={isSoon}
+                  className={`pill-tab ${isActive ? 'active' : ''} ${isSoon ? 'soon' : ''}`}
+                >
+                  {tool.name}
+                  {isSoon && <span className="soon-badge">Soon</span>}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        <section id="tool-panel" className="tool-panel p-6 md:p-10">
           {activeToolImplemented ? (
-            <div className="grid gap-5">
-              <div className="space-y-5">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.85fr)]">
+              <div className="space-y-6">
                 {isCompressTool && (
                   <>
                     <div className="space-y-2">
-                      <h2 className="font-display text-2xl text-slate-900">Optimize Media</h2>
-                      <p className="text-sm text-slate-600">Keep quality high while making uploads platform-friendly.</p>
+                      <h2 className="text-2xl font-bold text-slate-900">Compress Video</h2>
+                      <p className="text-sm text-slate-600">Upload, choose preset, compress, download.</p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="media-toggle">
                       <button
                         type="button"
                         onClick={() => setCompressMediaType('video')}
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          compressMediaType === 'video'
-                            ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
-                        }`}
+                        className={compressMediaType === 'video' ? 'active' : ''}
                       >
-                        <p className="text-sm font-semibold">Video</p>
-                        <p className="mt-1 text-xs text-slate-500">MP4, MOV, AVI and more</p>
+                        Video
                       </button>
                       <button
                         type="button"
                         onClick={() => setCompressMediaType('image')}
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          compressMediaType === 'image'
-                            ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
-                        }`}
+                        className={compressMediaType === 'image' ? 'active' : ''}
                       >
-                        <p className="text-sm font-semibold">Image</p>
-                        <p className="mt-1 text-xs text-slate-500">JPG, PNG, WEBP and more</p>
+                        Image
                       </button>
                     </div>
 
-                    <label className="dropzone block cursor-pointer rounded-xl p-6 text-center">
-                      <span className="mb-2 block text-sm font-semibold text-slate-700">
-                        {compressMediaType === 'video' ? 'Video File' : 'Image File'}
-                      </span>
+                    <label
+                      htmlFor="media-input"
+                      className={`upload-zone ${isDropActive ? 'dragging' : ''}`}
+                      onDragEnter={handleDragOver}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
                       <input
+                        id="media-input"
                         type="file"
                         accept={fileAccept}
                         onChange={handleFileChange}
-                        className="block w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+                        className="sr-only"
                       />
+                      <svg className="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 7.9H7z" />
+                        <path d="M12 9v8" />
+                        <path d="m9 12 3-3 3 3" />
+                      </svg>
+                      <p className="text-sm font-semibold text-slate-800">{modeLabel}</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">Drag & drop your file here</p>
+                      <p className="mt-1 text-sm text-slate-600">or click to browse</p>
+                      <p className="mt-2 text-xs text-slate-500">{modeHint}</p>
                       {selectedFile && (
-                        <p className="mt-3 text-xs text-slate-700">
+                        <p className="mt-3 text-xs font-semibold text-slate-700">
                           {selectedFile.name} ({formatBytes(selectedFile.size)})
                         </p>
                       )}
                     </label>
 
                     <div>
-                      <p className="mb-2 text-sm font-semibold text-slate-700">Platform Preset</p>
+                      <p className="mb-3 text-sm font-semibold text-slate-700">Platform Preset</p>
                       <div className="grid gap-3 sm:grid-cols-3">
                         {COMPRESSION_PRESETS.map((preset) => {
                           const isSelected = compressionPresetId === preset.id
@@ -733,9 +791,9 @@ function App() {
                               key={preset.id}
                               type="button"
                               onClick={() => setCompressionPresetId(preset.id)}
-                              className={`rounded-xl border px-3 py-3 text-left transition ${
+                              className={`rounded-xl border px-3 py-3 text-left ${
                                 isSelected
-                                  ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
+                                  ? 'border-blue-300 bg-blue-50 text-blue-800 shadow-sm'
                                   : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
                               }`}
                             >
@@ -751,13 +809,13 @@ function App() {
                       type="button"
                       onClick={handleCompress}
                       disabled={!selectedFile || isProcessing || isEngineLoading}
-                      className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 ${actionTone}`}
+                      className="action-btn"
                     >
                       {isProcessing
                         ? `Processing... ${progressPercent}%`
                         : isEngineLoading
                           ? 'Loading Engine...'
-                          : `Optimize ${compressMediaType === 'video' ? 'Video' : 'Image'}`}
+                          : `Process ${compressMediaType === 'video' ? 'Video' : 'Image'}`}
                     </button>
                   </>
                 )}
@@ -765,34 +823,24 @@ function App() {
                 {isResizeTool && (
                   <>
                     <div className="space-y-2">
-                      <h2 className="font-display text-2xl text-slate-900">Resize for Reels/TikTok/WhatsApp</h2>
+                      <h2 className="text-2xl font-bold text-slate-900">Resize for Reels/TikTok/WhatsApp</h2>
                       <p className="text-sm text-slate-600">Pick mode, quality, frame style, then resize.</p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="media-toggle">
                       <button
                         type="button"
                         onClick={() => setResizeMediaType('video')}
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          resizeMediaType === 'video'
-                            ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
-                        }`}
+                        className={resizeMediaType === 'video' ? 'active' : ''}
                       >
-                        <p className="text-sm font-semibold">Video Resize</p>
-                        <p className="mt-1 text-xs text-slate-500">For MP4/MOV inputs</p>
+                        Video
                       </button>
                       <button
                         type="button"
                         onClick={() => setResizeMediaType('image')}
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          resizeMediaType === 'image'
-                            ? 'border-blue-200 bg-gradient-to-r from-blue-100 via-indigo-50 to-cyan-100 text-blue-800'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
-                        }`}
+                        className={resizeMediaType === 'image' ? 'active' : ''}
                       >
-                        <p className="text-sm font-semibold">Image Resize</p>
-                        <p className="mt-1 text-xs text-slate-500">For JPG/PNG/WEBP inputs</p>
+                        Image
                       </button>
                     </div>
 
@@ -805,7 +853,7 @@ function App() {
                           id="resize-quality"
                           value={resizeQualityId}
                           onChange={(event) => setResizeQualityId(event.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                          className="custom-select"
                         >
                           {RESIZE_QUALITY_PRESETS.map((quality) => (
                             <option key={quality.id} value={quality.id}>
@@ -823,7 +871,7 @@ function App() {
                           id="resize-frame"
                           value={resizeFrameMode}
                           onChange={(event) => setResizeFrameMode(event.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                          className="custom-select"
                         >
                           {RESIZE_FRAME_MODES.map((mode) => (
                             <option key={mode.id} value={mode.id}>
@@ -834,18 +882,32 @@ function App() {
                       </div>
                     </div>
 
-                    <label className="dropzone block cursor-pointer rounded-xl p-6 text-center">
-                      <span className="mb-2 block text-sm font-semibold text-slate-700">
-                        {resizeMediaType === 'video' ? 'Video File' : 'Image File'}
-                      </span>
+                    <label
+                      htmlFor="media-input"
+                      className={`upload-zone ${isDropActive ? 'dragging' : ''}`}
+                      onDragEnter={handleDragOver}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
                       <input
+                        id="media-input"
                         type="file"
                         accept={fileAccept}
                         onChange={handleFileChange}
-                        className="block w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+                        className="sr-only"
                       />
+                      <svg className="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 7.9H7z" />
+                        <path d="M12 9v8" />
+                        <path d="m9 12 3-3 3 3" />
+                      </svg>
+                      <p className="text-sm font-semibold text-slate-800">{modeLabel}</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">Drag & drop your file here</p>
+                      <p className="mt-1 text-sm text-slate-600">or click to browse</p>
+                      <p className="mt-2 text-xs text-slate-500">{modeHint}</p>
                       {selectedFile && (
-                        <p className="mt-3 text-xs text-slate-700">
+                        <p className="mt-3 text-xs font-semibold text-slate-700">
                           {selectedFile.name} ({formatBytes(selectedFile.size)})
                         </p>
                       )}
@@ -859,7 +921,7 @@ function App() {
                         id="resize-target"
                         value={resizePresetId}
                         onChange={(event) => setResizePresetId(event.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                        className="custom-select"
                       >
                         {RESIZE_PRESETS.map((preset) => (
                           <option key={preset.id} value={preset.id}>
@@ -878,7 +940,7 @@ function App() {
                           id="resize-output"
                           value={imageOutputId}
                           onChange={(event) => setImageOutputId(event.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                          className="custom-select"
                         >
                           {IMAGE_OUTPUT_FORMATS.map((format) => (
                             <option key={format.id} value={format.id}>
@@ -893,7 +955,7 @@ function App() {
                       type="button"
                       onClick={handleResize}
                       disabled={!selectedFile || isProcessing || isEngineLoading}
-                      className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 ${actionTone}`}
+                      className="action-btn"
                     >
                       {isProcessing
                         ? `Processing... ${progressPercent}%`
@@ -905,7 +967,7 @@ function App() {
                 )}
               </div>
 
-              <aside className="soft-panel space-y-4 rounded-xl p-4">
+              <aside className="status-panel space-y-4 p-5">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Status</p>
                   <p className="mt-1 text-sm text-slate-900">{statusMessage}</p>
@@ -928,14 +990,14 @@ function App() {
                       <span>Progress</span>
                       <span>{progressPercent}%</span>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-blue-100">
-                      <div className={`h-full rounded-full transition-all ${progressTone}`} style={{ width: `${progressPercent}%` }} />
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                     </div>
                   </div>
                 )}
 
                 {result && (
-                  <div className={`rounded-xl border p-4 ${resultCardTone}`}>
+                  <div className="result-card p-4 text-slate-800">
                     <p className="text-sm font-semibold">Output Ready</p>
                     <p className="mt-1 text-xs opacity-90">{result.fileName}</p>
                     <p className="mt-1 text-xs opacity-90">{result.summary}</p>
@@ -949,7 +1011,7 @@ function App() {
                     <a
                       href={result.url}
                       download={result.fileName}
-                      className="primary-btn mt-3 inline-flex rounded-lg px-3 py-2 text-xs font-semibold"
+                      className="download-link mt-3"
                     >
                       Download File
                     </a>
@@ -963,7 +1025,55 @@ function App() {
             </div>
           )}
         </section>
+
+        <section className="trust-strip">
+          <div className="grid gap-8 text-center md:grid-cols-3">
+            <div className="space-y-2">
+              <p className="text-xl font-bold text-slate-900">🔒 100% Private</p>
+              <p className="text-sm text-slate-600">Everything runs in your browser, never on our servers.</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xl font-bold text-slate-900">⚡ Blazing Fast</p>
+              <p className="text-sm text-slate-600">Optimized workflows keep processing quick and simple.</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xl font-bold text-slate-900">🎯 Built for Creators</p>
+              <p className="text-sm text-slate-600">Made for WhatsApp, Reels, TikTok, and creator needs.</p>
+            </div>
+          </div>
+        </section>
       </div>
+
+      <footer className="footer-shell mt-10">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+          <div className="flex flex-col gap-8 border-b border-slate-700 pb-8 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-2xl font-extrabold tracking-tight text-white">
+                <span className="text-white">iLove</span>
+                <span className="text-blue-400">Video</span>
+              </p>
+              <p className="mt-2 text-sm text-slate-300">Compress and resize media for social platforms in seconds.</p>
+            </div>
+
+            <div className="flex flex-col gap-4 md:items-end">
+              <div className="flex flex-wrap gap-4 text-sm">
+                <a href="#tool-panel" className="footer-link">
+                  Tools
+                </a>
+                <a href="#" className="footer-link">
+                  Privacy
+                </a>
+                <a href="#" className="footer-link">
+                  Terms
+                </a>
+              </div>
+              <p className="text-sm text-slate-300">Made for the world 🌍</p>
+            </div>
+          </div>
+
+          <p className="pt-6 text-sm text-slate-400">© 2026 iLoveVideo.fun</p>
+        </div>
+      </footer>
     </main>
   )
 }
