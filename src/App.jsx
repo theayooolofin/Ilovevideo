@@ -155,8 +155,8 @@ const toDownloadUrl = (url) => {
 }
 
 // Upload a video file directly to Cloudinary from the browser using an unsigned preset.
-// onProgress(0–75) tracks upload; caller sets 100 on success.
-const uploadToCloudinary = (file, eagerTransform, onProgress) =>
+// onProgress(0–100) tracks upload progress.
+const uploadToCloudinary = (file, onProgress) =>
   new Promise((resolve, reject) => {
     const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
     const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
@@ -169,14 +169,12 @@ const uploadToCloudinary = (file, eagerTransform, onProgress) =>
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', uploadPreset)
-    formData.append('eager', eagerTransform)
-    formData.append('eager_async', 'false')
 
     const xhr = new XMLHttpRequest()
 
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 75))
+        onProgress(Math.round((e.loaded / e.total) * 100))
       }
     })
 
@@ -267,7 +265,7 @@ function App() {
     selectedFile.size > LARGE_FILE_THRESHOLD_BYTES
   const largeFileSizeMB = selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(1) : '0.0'
   const resultStats = useMemo(() => {
-    if (!selectedFile || !result) return null
+    if (!selectedFile || !result || result.sizeBytes == null) return null
     const delta = selectedFile.size - result.sizeBytes
     const percentage = selectedFile.size > 0 ? (Math.abs(delta) / selectedFile.size) * 100 : 0
     return { delta, percentage }
@@ -434,19 +432,17 @@ function App() {
     try {
       setStatusMessage(`Uploading to Cloudinary (${compressionPreset.label} preset)...`)
       const { quality, width } = compressionPreset.cloudinary
-      const eagerTransform = `w_${width},c_scale,q_${quality},vc_auto,f_mp4`
 
-      const data = await uploadToCloudinary(selectedFile, eagerTransform, setProgress)
-      setProgress(90)
-      setStatusMessage('Finalising compressed video...')
+      const data = await uploadToCloudinary(selectedFile, setProgress)
+      setStatusMessage('Processing complete.')
 
-      const compressed = data.eager?.[0]
-      if (!compressed) throw new Error('No compressed output received from Cloudinary.')
+      const transform = `w_${width},c_scale,q_${quality},vc_auto,f_mp4`
+      const downloadUrl = data.secure_url.replace('/upload/', `/upload/${transform},fl_attachment/`)
 
       setResult({
-        url: compressed.secure_url,
+        url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.mp4`,
-        sizeBytes: compressed.bytes,
+        sizeBytes: null,
         summary: `Preset: ${compressionPreset.label}`,
       })
       setProgress(100)
@@ -474,21 +470,18 @@ function App() {
     try {
       setStatusMessage(`Uploading video for ${resizePreset.label} resize...`)
 
+      const data = await uploadToCloudinary(selectedFile, setProgress)
+      setStatusMessage('Processing complete.')
+
       const cropMode = resizeFrameMode === 'crop' ? 'fill' : 'pad'
       const bgParam = resizeFrameMode === 'crop' ? '' : ',b_black'
-      const eagerTransform = `w_${resizePreset.width},h_${resizePreset.height},c_${cropMode}${bgParam},g_center,q_${resizeQuality.cloudinaryQuality},vc_auto,f_mp4`
-
-      const data = await uploadToCloudinary(selectedFile, eagerTransform, setProgress)
-      setProgress(90)
-      setStatusMessage('Finalising resized video...')
-
-      const transformed = data.eager?.[0]
-      if (!transformed) throw new Error('No output received from Cloudinary.')
+      const transform = `w_${resizePreset.width},h_${resizePreset.height},c_${cropMode}${bgParam},g_center,q_${resizeQuality.cloudinaryQuality},vc_auto,f_mp4`
+      const downloadUrl = data.secure_url.replace('/upload/', `/upload/${transform},fl_attachment/`)
 
       setResult({
-        url: transformed.secure_url,
+        url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${resizePreset.id}-${resizeFrameMode}-${resizePreset.width}x${resizePreset.height}.mp4`,
-        sizeBytes: transformed.bytes,
+        sizeBytes: null,
         summary: `${resizePreset.width}×${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
       })
       setProgress(100)
@@ -847,7 +840,7 @@ function App() {
                       <div className="output-body">
                         <p className="output-title">Output Ready</p>
                         <p className="output-meta">
-                          {formatBytes(result.sizeBytes)}
+                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
@@ -1022,7 +1015,7 @@ function App() {
                       <div className="output-body">
                         <p className="output-title">Output Ready</p>
                         <p className="output-meta">
-                          {formatBytes(result.sizeBytes)}
+                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
