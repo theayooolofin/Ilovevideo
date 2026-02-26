@@ -808,6 +808,7 @@ function App() {
   const activeToolImplemented = isCompressTool || isResizeTool
   const needsVideoEngine =
     (isCompressTool && compressMediaType === 'video') || (isResizeTool && resizeMediaType === 'video')
+  const showEngineLoadingUI = Boolean(selectedFile) && isEngineLoading && !isEngineReady && needsVideoEngine
   const modeLabel = isCompressTool
     ? compressMediaType === 'video'
       ? 'Video File'
@@ -933,7 +934,7 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
-                  {!isEngineReady && needsVideoEngine && (
+                  {showEngineLoadingUI && (
                     <p className="engine-prep-note">⚡ Preparing engine...</p>
                   )}
 
@@ -1039,12 +1040,12 @@ function App() {
                     disabled={!selectedFile || isProcessing}
                     className="action-btn"
                   >
-                    {(isProcessing || (isEngineLoading && !isEngineReady && needsVideoEngine)) && (
+                    {(isProcessing || showEngineLoadingUI) && (
                       <span className="action-spinner" />
                     )}
                     {isProcessing
                       ? `Processing… ${progressPercent}%`
-                      : isEngineLoading && !isEngineReady && needsVideoEngine
+                      : showEngineLoadingUI
                         ? 'Loading Engine…'
                         : `Compress ${compressMediaType === 'video' ? 'Video' : 'Image'} →`}
                   </button>
@@ -1101,7 +1102,7 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
-                  {!isEngineReady && needsVideoEngine && (
+                  {showEngineLoadingUI && (
                     <p className="engine-prep-note">⚡ Preparing engine...</p>
                   )}
 
@@ -1219,12 +1220,12 @@ function App() {
                     disabled={!selectedFile || isProcessing}
                     className="action-btn"
                   >
-                    {(isProcessing || (isEngineLoading && !isEngineReady && needsVideoEngine)) && (
+                    {(isProcessing || showEngineLoadingUI) && (
                       <span className="action-spinner" />
                     )}
                     {isProcessing
                       ? `Processing… ${progressPercent}%`
-                      : isEngineLoading && !isEngineReady && needsVideoEngine
+                      : showEngineLoadingUI
                         ? 'Loading Engine…'
                         : `Resize ${resizeMediaType === 'video' ? 'Video' : 'Image'} →`}
                   </button>
