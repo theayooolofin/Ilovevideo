@@ -16,6 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       HOSTINGER_SERVER_DIR: ${{ secrets.HOSTINGER_FTP_SERVER_DIR || '/public_html/' }}
     steps:
@@ -54,6 +55,7 @@ jobs:
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           protocol: ftps
           port: 21
+          timeout: 600000
           local-dir: ./dist/
           server-dir: ${{ env.HOSTINGER_SERVER_DIR }}
 
@@ -66,5 +68,6 @@ jobs:
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           protocol: ftp
           port: 21
+          timeout: 600000
           local-dir: ./dist/
           server-dir: ${{ env.HOSTINGER_SERVER_DIR }}
