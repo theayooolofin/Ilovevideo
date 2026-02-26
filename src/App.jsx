@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { fetchFile } from '@ffmpeg/util'
 
 const FFMPEG_CORE_CANDIDATES = [
-  { type: 'local', baseURL: '/ffmpeg' },
-  { type: 'remote', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm' },
-  { type: 'remote', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm' },
+  { id: 'local', coreURL: '/ffmpeg/ffmpeg-core.js', wasmURL: '/ffmpeg/ffmpeg-core.wasm' },
+  {
+    id: 'jsdelivr',
+    coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js',
+    wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm',
+  },
+  {
+    id: 'unpkg',
+    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js',
+    wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm',
+  },
 ]
+const FFMPEG_LOAD_TIMEOUT_MS = 45000
 const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 const COMPATIBILITY_VIDEO_ARGS = [
   '-vf',
@@ -24,28 +33,6 @@ const COMPATIBILITY_VIDEO_ARGS = [
   '-b:a',
   '96k',
 ]
-
-const resolveCoreURLs = async () => {
-  let lastError = null
-  for (const source of FFMPEG_CORE_CANDIDATES) {
-    try {
-      if (source.type === 'local') {
-        const base = `${window.location.origin}${source.baseURL}`
-        const coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript')
-        const wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm')
-        return { coreURL, wasmURL }
-      }
-
-      const coreURL = await toBlobURL(`${source.baseURL}/ffmpeg-core.js`, 'text/javascript')
-      const wasmURL = await toBlobURL(`${source.baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-      return { coreURL, wasmURL }
-    } catch (error) {
-      lastError = error
-    }
-  }
-  const lastMessage = lastError instanceof Error ? lastError.message : String(lastError ?? 'Unknown network error.')
-  throw new Error(`Unable to load FFmpeg engine. ${lastMessage}`)
-}
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -389,13 +376,39 @@ function App() {
     }
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = (async () => {
+        const ffmpeg = ffmpegRef.current
+        const waitWithTimeout = (promise, label) =>
+          Promise.race([
+            promise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`${label} timed out after ${FFMPEG_LOAD_TIMEOUT_MS / 1000}s`)), FFMPEG_LOAD_TIMEOUT_MS),
+            ),
+          ])
+
         setIsEngineLoading(true)
         setStatusMessage('Loading FFmpeg.wasm core...')
-        const { coreURL, wasmURL } = await resolveCoreURLs()
-        await ffmpegRef.current.load({ coreURL, wasmURL })
-        setIsEngineReady(true)
+
+        const loadErrors = []
+        for (const candidate of FFMPEG_CORE_CANDIDATES) {
+          const coreURL = new URL(candidate.coreURL, window.location.href).toString()
+          const wasmURL = new URL(candidate.wasmURL, window.location.href).toString()
+          try {
+            setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
+            await waitWithTimeout(ffmpeg.load({ coreURL, wasmURL }), `FFmpeg core (${candidate.id})`)
+            setIsEngineReady(true)
+            setStatusMessage('FFmpeg.wasm loaded successfully.')
+            return
+          } catch (error) {
+            const reason = toErrorMessage(error, 'Unknown load error')
+            loadErrors.push(`${candidate.id}: ${reason}`)
+            ffmpeg.terminate()
+          }
+        }
+
+        throw new Error(`Unable to load FFmpeg core. ${loadErrors.join(' | ')}`)
       })()
         .catch((error) => {
+          setIsEngineReady(false)
           loadPromiseRef.current = null
           throw error
         })
