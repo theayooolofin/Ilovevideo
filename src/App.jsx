@@ -243,6 +243,7 @@ function App() {
   const [imageOutputId, setImageOutputId] = useState(IMAGE_OUTPUT_FORMATS[0].id)
   const [isEngineLoading, setIsEngineLoading] = useState(false)
   const [isEngineReady, setIsEngineReady] = useState(false)
+  const [isEngineFailed, setIsEngineFailed] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
@@ -376,6 +377,7 @@ function App() {
 
         setIsEngineLoading(true)
         setIsEngineSlow(false)
+        setIsEngineFailed(false)
         if (!silent) setStatusMessage('Loading FFmpeg.wasm core...')
 
         await waitWithTimeout(
@@ -391,6 +393,7 @@ function App() {
       })()
         .catch((error) => {
           setIsEngineReady(false)
+          setIsEngineFailed(true)
           ffmpegRef.current.terminate()
           loadPromiseRef.current = null
           throw error
@@ -405,9 +408,9 @@ function App() {
   }, [loadEngine])
 
   useEffect(() => {
-    if (!selectedFile || !needsVideoEngine || isEngineReady || isEngineLoading) return
+    if (!selectedFile || !needsVideoEngine || isEngineReady || isEngineLoading || isEngineFailed) return
     loadEngine({ silent: true }).catch(() => {})
-  }, [selectedFile, needsVideoEngine, isEngineReady, isEngineLoading, loadEngine])
+  }, [selectedFile, needsVideoEngine, isEngineReady, isEngineLoading, isEngineFailed, loadEngine])
 
   useEffect(() => {
     if (!(selectedFile && isEngineLoading && needsVideoEngine && !isEngineReady)) {
@@ -766,19 +769,20 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && !isEngineReady
-  const showEngineTimeoutWarning = showEnginePrepIndicator && isEngineSlow
-  const showEngineLoadingUI = showEnginePrepIndicator && isEngineLoading
+  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && isEngineLoading && !isEngineReady
+  const showEngineTimeoutWarning = Boolean(selectedFile) && needsVideoEngine && isEngineSlow && !isEngineReady
+  const showEngineFailedWarning = Boolean(selectedFile) && needsVideoEngine && isEngineFailed && !isEngineReady
+  const showEngineLoadingUI = showEnginePrepIndicator
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    if (compressMediaType === 'video' && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    if (compressMediaType === 'video' && isEngineLoading && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
     if (isProcessing) return { text: `Compressing... ${progressPercent}%`, disabled: true }
     if (compressMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
   }
   const getResizeButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    if (resizeMediaType === 'video' && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    if (resizeMediaType === 'video' && isEngineLoading && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
     if (isProcessing) return { text: `Processing... ${progressPercent}%`, disabled: true }
     if (resizeMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
@@ -1020,6 +1024,14 @@ function App() {
                       </button>
                     </div>
                   )}
+                  {showEngineFailedWarning && compressMediaType === 'video' && (
+                    <div className="engine-timeout-warning">
+                      <span>⚠️ Engine failed to load. Tap Process Video to retry, or refresh the page.</span>{' '}
+                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
+                        Refresh Page
+                      </button>
+                    </div>
+                  )}
 
                   {/* Action Button */}
                   <button
@@ -1203,6 +1215,14 @@ function App() {
                   {showEngineTimeoutWarning && resizeMediaType === 'video' && (
                     <div className="engine-timeout-warning">
                       <span>⚠️ Engine is taking longer than usual. Check your connection and refresh the page.</span>{' '}
+                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
+                        Refresh Page
+                      </button>
+                    </div>
+                  )}
+                  {showEngineFailedWarning && resizeMediaType === 'video' && (
+                    <div className="engine-timeout-warning">
+                      <span>⚠️ Engine failed to load. Tap Process Video to retry, or refresh the page.</span>{' '}
                       <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
                         Refresh Page
                       </button>
