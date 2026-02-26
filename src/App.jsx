@@ -2,7 +2,25 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
-const FFMPEG_BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.9/dist/umd'
+const FFMPEG_CORE_CANDIDATES = [
+  'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
+  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
+]
+
+const resolveCoreURLs = async () => {
+  let lastError = null
+  for (const baseURL of FFMPEG_CORE_CANDIDATES) {
+    try {
+      const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
+      const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+      return { coreURL, wasmURL }
+    } catch (error) {
+      lastError = error
+    }
+  }
+  const lastMessage = lastError instanceof Error ? lastError.message : 'Unknown network error.'
+  throw new Error(`Unable to load FFmpeg engine from CDN. ${lastMessage}`)
+}
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -323,8 +341,7 @@ function App() {
       loadPromiseRef.current = (async () => {
         setIsEngineLoading(true)
         setStatusMessage('Loading FFmpeg.wasm core...')
-        const coreURL = await toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.js`, 'text/javascript')
-        const wasmURL = await toBlobURL(`${FFMPEG_BASE_URL}/ffmpeg-core.wasm`, 'application/wasm')
+        const { coreURL, wasmURL } = await resolveCoreURLs()
         await ffmpegRef.current.load({ coreURL, wasmURL })
         setIsEngineReady(true)
       })()
@@ -428,7 +445,13 @@ function App() {
       setStatusMessage(completeMessage)
       success = true
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : `${failMessage}.`)
+      const message = error instanceof Error ? error.message : `${failMessage}.`
+      const engineBlocked = message.includes('Unable to load FFmpeg engine')
+      setErrorMessage(
+        engineBlocked
+          ? `${message} Check internet/ad-blocker settings and retry.`
+          : message,
+      )
       setStatusMessage(`${failMessage}.`)
     } finally {
       setIsProcessing(false)
