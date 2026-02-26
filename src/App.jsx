@@ -7,6 +7,23 @@ const FFMPEG_CORE_CANDIDATES = [
   { type: 'remote', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd' },
   { type: 'remote', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd' },
 ]
+const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+const COMPATIBILITY_VIDEO_ARGS = [
+  '-vf',
+  EVEN_SCALE_FILTER,
+  '-r',
+  '30',
+  '-c:v',
+  'mpeg4',
+  '-q:v',
+  '7',
+  '-movflags',
+  '+faststart',
+  '-c:a',
+  'aac',
+  '-b:a',
+  '96k',
+]
 
 const resolveCoreURLs = async () => {
   let lastError = null
@@ -53,6 +70,8 @@ const COMPRESSION_PRESETS = [
     label: 'WhatsApp',
     details: 'Small files for quick sharing.',
     ffmpegArgs: [
+      '-vf',
+      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
@@ -78,6 +97,8 @@ const COMPRESSION_PRESETS = [
     label: 'Instagram Reel',
     details: 'Balanced quality and size.',
     ffmpegArgs: [
+      '-vf',
+      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
@@ -103,6 +124,8 @@ const COMPRESSION_PRESETS = [
     label: 'TikTok',
     details: 'Higher quality while reducing size.',
     ffmpegArgs: [
+      '-vf',
+      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
@@ -433,6 +456,8 @@ function App() {
     processingMessage,
     outputNameSuffix,
     outputArgs,
+    fallbackOutputArgs,
+    fallbackMessage,
     downloadName,
     completeMessage,
     failMessage,
@@ -455,7 +480,7 @@ function App() {
       setStatusMessage(processingMessage)
 
       await ffmpeg.writeFile(inputName, await fetchFile(selectedFile))
-      const exitCode = await ffmpeg.exec([
+      let exitCode = await ffmpeg.exec([
         '-i',
         inputName,
         '-map',
@@ -465,6 +490,21 @@ function App() {
         ...outputArgs,
         outputName,
       ])
+      if (exitCode !== 0 && Array.isArray(fallbackOutputArgs) && fallbackOutputArgs.length > 0) {
+        setStatusMessage(fallbackMessage ?? 'Retrying with compatibility mode...')
+        lastFfmpegLogRef.current = ''
+        await Promise.allSettled([ffmpeg.deleteFile(outputName)])
+        exitCode = await ffmpeg.exec([
+          '-i',
+          inputName,
+          '-map',
+          '0:v:0',
+          '-map',
+          '0:a:0?',
+          ...fallbackOutputArgs,
+          outputName,
+        ])
+      }
       if (exitCode !== 0) throw new Error(`${failMessage} (exit code ${exitCode}).`)
 
       const outputData = await ffmpeg.readFile(outputName)
@@ -573,6 +613,8 @@ function App() {
       processingMessage: `Compressing with ${compressionPreset.label} preset...`,
       outputNameSuffix: `compressed-${compressionPreset.id}`,
       outputArgs: compressionPreset.ffmpegArgs,
+      fallbackOutputArgs: COMPATIBILITY_VIDEO_ARGS,
+      fallbackMessage: 'Retrying with compatibility video mode...',
       downloadName: outputName,
       completeMessage: 'Compression complete. Download is ready.',
       failMessage: 'Compression failed',
