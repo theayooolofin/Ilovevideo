@@ -3,23 +3,34 @@ import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 const FFMPEG_CORE_CANDIDATES = [
-  'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
-  'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
+  { type: 'local', baseURL: '/ffmpeg' },
+  { type: 'remote', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd' },
+  { type: 'remote', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd' },
 ]
 
 const resolveCoreURLs = async () => {
   let lastError = null
-  for (const baseURL of FFMPEG_CORE_CANDIDATES) {
+  for (const source of FFMPEG_CORE_CANDIDATES) {
     try {
-      const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
-      const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+      if (source.type === 'local') {
+        const coreURL = `${source.baseURL}/ffmpeg-core.js`
+        const wasmURL = `${source.baseURL}/ffmpeg-core.wasm`
+        const check = await fetch(coreURL, { method: 'HEAD' })
+        if (!check.ok && check.status !== 405) {
+          throw new Error(`Local FFmpeg core unavailable (${check.status}).`)
+        }
+        return { coreURL, wasmURL }
+      }
+
+      const coreURL = await toBlobURL(`${source.baseURL}/ffmpeg-core.js`, 'text/javascript')
+      const wasmURL = await toBlobURL(`${source.baseURL}/ffmpeg-core.wasm`, 'application/wasm')
       return { coreURL, wasmURL }
     } catch (error) {
       lastError = error
     }
   }
-  const lastMessage = lastError instanceof Error ? lastError.message : 'Unknown network error.'
-  throw new Error(`Unable to load FFmpeg engine from CDN. ${lastMessage}`)
+  const lastMessage = lastError instanceof Error ? lastError.message : String(lastError ?? 'Unknown network error.')
+  throw new Error(`Unable to load FFmpeg engine. ${lastMessage}`)
 }
 
 const TOOL_CARDS = [
@@ -179,6 +190,17 @@ const formatBytes = (bytes) => {
   return `${value.toFixed(value >= 100 || index === 0 ? 0 : 1)} ${units[index]}`
 }
 
+const toErrorMessage = (error, fallback) => {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error.trim()) return error
+  try {
+    const serialized = JSON.stringify(error)
+    return serialized && serialized !== '{}' ? serialized : fallback
+  } catch {
+    return fallback
+  }
+}
+
 const baseName = (name) => {
   const index = name.lastIndexOf('.')
   return index <= 0 ? name : name.slice(0, index)
@@ -244,6 +266,7 @@ function App() {
 
   const ffmpegRef = useRef(new FFmpeg())
   const loadPromiseRef = useRef(null)
+  const lastFfmpegLogRef = useRef('')
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -293,9 +316,16 @@ function App() {
       if (!Number.isFinite(nextProgress)) return
       setProgress(Math.max(0, Math.min(1, nextProgress)))
     }
+    const onLog = ({ message }) => {
+      if (typeof message === 'string' && message.trim()) {
+        lastFfmpegLogRef.current = message.trim()
+      }
+    }
     ffmpeg.on('progress', onProgress)
+    ffmpeg.on('log', onLog)
     return () => {
       ffmpeg.off('progress', onProgress)
+      ffmpeg.off('log', onLog)
       ffmpeg.terminate()
     }
   }, [])
@@ -428,7 +458,16 @@ function App() {
       setStatusMessage(processingMessage)
 
       await ffmpeg.writeFile(inputName, await fetchFile(selectedFile))
-      const exitCode = await ffmpeg.exec(['-i', inputName, ...outputArgs, outputName])
+      const exitCode = await ffmpeg.exec([
+        '-i',
+        inputName,
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a:0?',
+        ...outputArgs,
+        outputName,
+      ])
       if (exitCode !== 0) throw new Error(`${failMessage} (exit code ${exitCode}).`)
 
       const outputData = await ffmpeg.readFile(outputName)
@@ -445,12 +484,13 @@ function App() {
       setStatusMessage(completeMessage)
       success = true
     } catch (error) {
-      const message = error instanceof Error ? error.message : `${failMessage}.`
+      const message = toErrorMessage(error, `${failMessage}.`)
+      const ffmpegHint = lastFfmpegLogRef.current ? ` Last FFmpeg log: ${lastFfmpegLogRef.current}` : ''
       const engineBlocked = message.includes('Unable to load FFmpeg engine')
       setErrorMessage(
         engineBlocked
-          ? `${message} Check internet/ad-blocker settings and retry.`
-          : message,
+          ? `${message} Check internet/ad-blocker settings and retry.${ffmpegHint}`
+          : `${message}${ffmpegHint}`,
       )
       setStatusMessage(`${failMessage}.`)
     } finally {
@@ -515,7 +555,7 @@ function App() {
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(1)
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Image optimization failed.')
+        setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
         setStatusMessage('Image optimization failed.')
         setProgress(0)
       } finally {
@@ -646,7 +686,7 @@ function App() {
       setStatusMessage('Image resize complete. High-quality output is ready.')
       setProgress(1)
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Image resize failed.')
+      setErrorMessage(toErrorMessage(error, 'Image resize failed.'))
       setStatusMessage('Image resize failed.')
       setProgress(0)
     } finally {
