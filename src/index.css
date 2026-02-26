@@ -466,10 +466,50 @@ button, a, input, select, textarea, label {
   margin: 0 0 24px;
 }
 
-.engine-prep-note {
-  margin: -10px 0 18px;
+.engine-prep-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0 2px;
   font-size: 12px;
   color: #6b7280;
+}
+
+.engine-prep-inline-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #64748b;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.engine-timeout-warning {
+  margin: 6px 0 2px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.engine-timeout-link {
+  border: 0;
+  background: transparent;
+  color: #b45309;
+  text-decoration: underline;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.engine-timeout-link:hover {
+  color: #92400e;
 }
 
 .status-line {

@@ -1,18 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile, toBlobURL } from '@ffmpeg/util'
+import { fetchFile } from '@ffmpeg/util'
 
-const FFMPEG_MT_CORE_BASE_URLS = [
-  { id: 'unpkg', baseURL: 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd' },
-  { id: 'jsdelivr', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd' },
-  { id: 'local', baseURL: '/ffmpeg' },
-]
-const FFMPEG_ST_CORE_BASE_URLS = [
-  { id: 'local-compat', baseURL: '/ffmpeg-single' },
-  { id: 'unpkg-compat', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd' },
-  { id: 'jsdelivr-compat', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd' },
-]
-const FFMPEG_LOAD_TIMEOUT_MS = 180000
+const FFMPEG_LOAD_TIMEOUT_MS = 120000
+const ENGINE_SLOW_WARNING_MS = 30000
 const LARGE_FILE_THRESHOLD_BYTES = 200 * 1024 * 1024
 const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 const COMPATIBILITY_VIDEO_ARGS = [
@@ -256,6 +247,7 @@ function App() {
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isEngineSlow, setIsEngineSlow] = useState(false)
   const [result, setResult] = useState(null)
   const [isDropActive, setIsDropActive] = useState(false)
 
@@ -289,6 +281,9 @@ function App() {
     if (selectedTool === 'resize') return resizeMediaType === 'image' ? 'image/*' : 'video/*'
     return 'video/*,image/*'
   }, [selectedTool, resizeMediaType, compressMediaType])
+  const needsVideoEngine =
+    (selectedTool === 'compress' && compressMediaType === 'video') ||
+    (selectedTool === 'resize' && resizeMediaType === 'video')
 
   const clearResult = () => {
     setResult((previous) => {
@@ -340,6 +335,7 @@ function App() {
   useEffect(() => {
     setSelectedFile(null)
     setErrorMessage('')
+    setIsEngineSlow(false)
     setProgress(0)
     setIsDropActive(false)
     clearResult()
@@ -370,25 +366,6 @@ function App() {
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = (async () => {
         const ffmpeg = ffmpegRef.current
-        const buildCoreConfig = async ({ baseURL, multiThread, direct }) => {
-          const normalizedBase = new URL(baseURL, window.location.href).toString().replace(/\/$/, '')
-
-          if (direct) {
-            return {
-              coreURL: `${normalizedBase}/ffmpeg-core.js`,
-              wasmURL: `${normalizedBase}/ffmpeg-core.wasm`,
-              ...(multiThread ? { workerURL: `${normalizedBase}/ffmpeg-core.worker.js` } : {}),
-            }
-          }
-
-          return {
-            coreURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.wasm`, 'application/wasm'),
-            ...(multiThread
-              ? { workerURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.worker.js`, 'text/javascript') }
-              : {}),
-          }
-        }
         const waitWithTimeout = (promise, label) =>
           Promise.race([
             promise,
@@ -398,56 +375,23 @@ function App() {
           ])
 
         setIsEngineLoading(true)
+        setIsEngineSlow(false)
         if (!silent) setStatusMessage('Loading FFmpeg.wasm core...')
 
-        const loadErrors = []
-        const canUseMultiThread = typeof window !== 'undefined' && window.crossOriginIsolated === true
-        if (canUseMultiThread) {
-          for (const candidate of FFMPEG_MT_CORE_BASE_URLS) {
-            try {
-              if (!silent) setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
-              const config = await buildCoreConfig({
-                baseURL: candidate.baseURL,
-                multiThread: true,
-                direct: candidate.id === 'local',
-              })
-              await waitWithTimeout(ffmpeg.load(config), `FFmpeg core (${candidate.id})`)
-              setIsEngineReady(true)
-              if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
-              return
-            } catch (error) {
-              const reason = toErrorMessage(error, 'Unknown load error')
-              loadErrors.push(`${candidate.id}: ${reason}`)
-              ffmpeg.terminate()
-            }
-          }
-        } else {
-          loadErrors.push('multi-thread engine unavailable: crossOriginIsolated is false')
-        }
-
-        for (const candidate of FFMPEG_ST_CORE_BASE_URLS) {
-          try {
-            if (!silent) setStatusMessage(`Loading compatibility core (${candidate.id})...`)
-            const config = await buildCoreConfig({
-              baseURL: candidate.baseURL,
-              multiThread: false,
-              direct: candidate.id === 'local-compat',
-            })
-            await waitWithTimeout(ffmpeg.load(config), `Compatibility core (${candidate.id})`)
-            setIsEngineReady(true)
-            if (!silent) setStatusMessage('FFmpeg.wasm loaded in compatibility mode.')
-            return
-          } catch (error) {
-            const reason = toErrorMessage(error, 'Unknown load error')
-            loadErrors.push(`${candidate.id}: ${reason}`)
-            ffmpeg.terminate()
-          }
-        }
-
-        throw new Error(`Unable to load FFmpeg engine. ${loadErrors.join(' | ')}`)
+        await waitWithTimeout(
+          ffmpeg.load({
+            coreURL: '/ffmpeg-core.js',
+            wasmURL: '/ffmpeg-core.wasm',
+            workerURL: '/ffmpeg-core.worker.js',
+          }),
+          'FFmpeg engine',
+        )
+        setIsEngineReady(true)
+        if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
       })()
         .catch((error) => {
           setIsEngineReady(false)
+          ffmpegRef.current.terminate()
           loadPromiseRef.current = null
           throw error
         })
@@ -459,6 +403,21 @@ function App() {
   useEffect(() => {
     loadEngine({ silent: true }).catch(() => {})
   }, [loadEngine])
+
+  useEffect(() => {
+    if (!selectedFile || !needsVideoEngine || isEngineReady || isEngineLoading) return
+    loadEngine({ silent: true }).catch(() => {})
+  }, [selectedFile, needsVideoEngine, isEngineReady, isEngineLoading, loadEngine])
+
+  useEffect(() => {
+    if (!(selectedFile && isEngineLoading && needsVideoEngine && !isEngineReady)) {
+      setIsEngineSlow(false)
+      return
+    }
+
+    const timer = setTimeout(() => setIsEngineSlow(true), ENGINE_SLOW_WARNING_MS)
+    return () => clearTimeout(timer)
+  }, [selectedFile, isEngineLoading, isEngineReady, needsVideoEngine])
 
   const validationError = (file) => {
     if (selectedTool === 'compress' && compressMediaType === 'video' && !isVideoFile(file)) {
@@ -480,6 +439,7 @@ function App() {
     }
     setSelectedFile(file)
     setErrorMessage('')
+    setIsEngineSlow(false)
     setProgress(0)
     clearResult()
     setStatusMessage(`Selected: ${file.name}`)
@@ -806,9 +766,25 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  const needsVideoEngine =
-    (isCompressTool && compressMediaType === 'video') || (isResizeTool && resizeMediaType === 'video')
-  const showEngineLoadingUI = Boolean(selectedFile) && isEngineLoading && !isEngineReady && needsVideoEngine
+  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && !isEngineReady
+  const showEngineTimeoutWarning = showEnginePrepIndicator && isEngineSlow
+  const showEngineLoadingUI = showEnginePrepIndicator && isEngineLoading
+  const getCompressButtonState = () => {
+    if (!selectedFile) return { text: 'Choose a File First', disabled: true }
+    if (compressMediaType === 'video' && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    if (isProcessing) return { text: `Compressing... ${progressPercent}%`, disabled: true }
+    if (compressMediaType === 'video') return { text: 'Process Video →', disabled: false }
+    return { text: 'Process Image →', disabled: false }
+  }
+  const getResizeButtonState = () => {
+    if (!selectedFile) return { text: 'Choose a File First', disabled: true }
+    if (resizeMediaType === 'video' && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    if (isProcessing) return { text: `Processing... ${progressPercent}%`, disabled: true }
+    if (resizeMediaType === 'video') return { text: 'Process Video →', disabled: false }
+    return { text: 'Process Image →', disabled: false }
+  }
+  const compressButtonState = getCompressButtonState()
+  const resizeButtonState = getResizeButtonState()
   const modeLabel = isCompressTool
     ? compressMediaType === 'video'
       ? 'Video File'
@@ -934,9 +910,6 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
-                  {showEngineLoadingUI && (
-                    <p className="engine-prep-note">⚡ Preparing engine...</p>
-                  )}
 
                   {/* Media Toggle */}
                   <div>
@@ -1033,21 +1006,32 @@ function App() {
                     </div>
                   </div>
 
+                  {showEnginePrepIndicator && compressMediaType === 'video' && (
+                    <div className="engine-prep-inline" role="status" aria-live="polite">
+                      <span className="engine-prep-inline-spinner" />
+                      <span>⚡ Preparing compression engine...</span>
+                    </div>
+                  )}
+                  {showEngineTimeoutWarning && compressMediaType === 'video' && (
+                    <div className="engine-timeout-warning">
+                      <span>⚠️ Engine is taking longer than usual. Check your connection and refresh the page.</span>{' '}
+                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
+                        Refresh Page
+                      </button>
+                    </div>
+                  )}
+
                   {/* Action Button */}
                   <button
                     type="button"
                     onClick={handleCompress}
-                    disabled={!selectedFile || isProcessing}
+                    disabled={compressButtonState.disabled}
                     className="action-btn"
                   >
                     {(isProcessing || showEngineLoadingUI) && (
                       <span className="action-spinner" />
                     )}
-                    {isProcessing
-                      ? `Processing… ${progressPercent}%`
-                      : showEngineLoadingUI
-                        ? 'Loading Engine…'
-                        : `Compress ${compressMediaType === 'video' ? 'Video' : 'Image'} →`}
+                    {compressButtonState.text}
                   </button>
                   <p className="status-line">{statusMessage}</p>
 
@@ -1102,9 +1086,6 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
-                  {showEngineLoadingUI && (
-                    <p className="engine-prep-note">⚡ Preparing engine...</p>
-                  )}
 
                   {/* Media Toggle */}
                   <div>
@@ -1213,21 +1194,32 @@ function App() {
                     </div>
                   )}
 
+                  {showEnginePrepIndicator && resizeMediaType === 'video' && (
+                    <div className="engine-prep-inline" role="status" aria-live="polite">
+                      <span className="engine-prep-inline-spinner" />
+                      <span>⚡ Preparing compression engine...</span>
+                    </div>
+                  )}
+                  {showEngineTimeoutWarning && resizeMediaType === 'video' && (
+                    <div className="engine-timeout-warning">
+                      <span>⚠️ Engine is taking longer than usual. Check your connection and refresh the page.</span>{' '}
+                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
+                        Refresh Page
+                      </button>
+                    </div>
+                  )}
+
                   {/* Action Button */}
                   <button
                     type="button"
                     onClick={handleResize}
-                    disabled={!selectedFile || isProcessing}
+                    disabled={resizeButtonState.disabled}
                     className="action-btn"
                   >
                     {(isProcessing || showEngineLoadingUI) && (
                       <span className="action-spinner" />
                     )}
-                    {isProcessing
-                      ? `Processing… ${progressPercent}%`
-                      : showEngineLoadingUI
-                        ? 'Loading Engine…'
-                        : `Resize ${resizeMediaType === 'video' ? 'Video' : 'Image'} →`}
+                    {resizeButtonState.text}
                   </button>
                   <p className="status-line">{statusMessage}</p>
 
