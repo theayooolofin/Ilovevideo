@@ -162,7 +162,7 @@ const uploadToCloudinary = (file, onProgress) =>
     const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 
     if (!cloudName || !uploadPreset) {
-      reject(new Error('Cloudinary is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to your .env.local file.'))
+      reject(new Error('Service is not configured. Please contact support.'))
       return
     }
 
@@ -183,12 +183,12 @@ const uploadToCloudinary = (file, onProgress) =>
         try {
           const data = JSON.parse(xhr.responseText)
           if (data.error) {
-            reject(new Error(data.error.message || 'Processing failed'))
+            reject(new Error('Processing failed. Please try again.'))
           } else {
             resolve(data)
           }
         } catch {
-          reject(new Error('Invalid response from Cloudinary'))
+          reject(new Error('Processing failed. Please try again.'))
         }
       } else {
         try {
@@ -218,6 +218,7 @@ function App() {
   const [resizeFrameMode, setResizeFrameMode] = useState(RESIZE_FRAME_MODES[0].id)
   const [imageOutputId, setImageOutputId] = useState(IMAGE_OUTPUT_FORMATS[0].id)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
@@ -430,7 +431,7 @@ function App() {
     setIsProcessing(true)
 
     try {
-      setStatusMessage(`Uploading to Cloudinary (${compressionPreset.label} preset)...`)
+      setStatusMessage(`Compressing video (${compressionPreset.label})...`)
       const { quality, width } = compressionPreset.cloudinary
 
       const data = await uploadToCloudinary(selectedFile, setProgress)
@@ -468,7 +469,7 @@ function App() {
     setIsProcessing(true)
 
     try {
-      setStatusMessage(`Uploading video for ${resizePreset.label} resize...`)
+      setStatusMessage(`Resizing video for ${resizePreset.label}...`)
 
       const data = await uploadToCloudinary(selectedFile, setProgress)
       setStatusMessage('Processing complete.')
@@ -569,6 +570,42 @@ function App() {
       return
     }
     await handleResizeImage()
+  }
+
+  const handleDownload = async () => {
+    if (!result || isDownloading) return
+    const url = result.url
+    // Blob URLs are same-origin — download directly
+    if (url.startsWith('blob:')) {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      return
+    }
+    // Remote URL — fetch as blob so the browser shows a native download
+    // dialog without navigating to the external domain
+    setIsDownloading(true)
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) throw new Error()
+      const blob = await resp.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = result.fileName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
+    } catch {
+      // Fallback: open in new tab
+      window.open(url, '_blank')
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const goToCompressTool = () => {
@@ -777,9 +814,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {compressMediaType === 'video' && progressPercent < 76
-                            ? `Uploading... ${progressPercent}%`
-                            : `Compressing... ${progressPercent}%`}
+                          {`Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -844,10 +879,12 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <a href={toDownloadUrl(result.url)} download={result.fileName} target="_blank" rel="noreferrer" className="download-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          Download File
-                        </a>
+                        <button type="button" onClick={handleDownload} disabled={isDownloading} className="download-btn">
+                          {isDownloading
+                            ? <><span className="action-spinner" style={{ width: '1em', height: '1em', borderWidth: 2 }} /> Downloading...</>
+                            : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg> Download File</>
+                          }
+                        </button>
                       </div>
                     </div>
                   )}
@@ -960,9 +997,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {resizeMediaType === 'video' && progressPercent < 76
-                            ? `Uploading... ${progressPercent}%`
-                            : `Processing... ${progressPercent}%`}
+                          {`Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -1019,10 +1054,12 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <a href={toDownloadUrl(result.url)} download={result.fileName} target="_blank" rel="noreferrer" className="download-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          Download File
-                        </a>
+                        <button type="button" onClick={handleDownload} disabled={isDownloading} className="download-btn">
+                          {isDownloading
+                            ? <><span className="action-spinner" style={{ width: '1em', height: '1em', borderWidth: 2 }} /> Downloading...</>
+                            : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg> Download File</>
+                          }
+                        </button>
                       </div>
                     </div>
                   )}
