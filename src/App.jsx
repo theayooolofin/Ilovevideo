@@ -1,29 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile } from '@ffmpeg/util'
+import { useEffect, useMemo, useState } from 'react'
 
-const FFMPEG_LOAD_TIMEOUT_MS = 120000
-const ENGINE_SLOW_WARNING_MS = 30000
 const LARGE_FILE_THRESHOLD_BYTES = 200 * 1024 * 1024
-const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
-const COMPATIBILITY_VIDEO_ARGS = [
-  '-vf',
-  EVEN_SCALE_FILTER,
-  '-preset',
-  'ultrafast',
-  '-r',
-  '30',
-  '-c:v',
-  'mpeg4',
-  '-q:v',
-  '7',
-  '-movflags',
-  '+faststart',
-  '-c:a',
-  'aac',
-  '-b:a',
-  '96k',
-]
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -47,70 +24,19 @@ const COMPRESSION_PRESETS = [
     id: 'whatsapp',
     label: 'WhatsApp',
     details: 'Small files for quick sharing.',
-    ffmpegArgs: [
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '28',
-      '-vf',
-      'scale=-2:720',
-      '-movflags',
-      '+faststart',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '96k',
-      '-threads',
-      '0',
-    ],
+    cloudinary: { quality: 'auto:low', width: 720 },
   },
   {
     id: 'instagram-reel',
     label: 'Instagram Reel',
     details: 'Balanced quality and size.',
-    ffmpegArgs: [
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '23',
-      '-vf',
-      'scale=-2:1080',
-      '-movflags',
-      '+faststart',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-threads',
-      '0',
-    ],
+    cloudinary: { quality: 'auto:good', width: 1080 },
   },
   {
     id: 'tiktok',
     label: 'TikTok',
     details: 'Higher quality while reducing size.',
-    ffmpegArgs: [
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-crf',
-      '25',
-      '-vf',
-      'scale=-2:1080',
-      '-movflags',
-      '+faststart',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-threads',
-      '0',
-    ],
+    cloudinary: { quality: 'auto:good', width: 1080 },
   },
 ]
 
@@ -136,21 +62,21 @@ const RESIZE_QUALITY_PRESETS = [
     id: 'visually-lossless',
     label: 'Visually Lossless',
     details: 'Best visual quality, larger files.',
-    video: { preset: 'slow', crf: '18', audioBitrate: '192k', maxrate: '12000k', bufsize: '24000k' },
+    cloudinaryQuality: 'auto:best',
     image: { jpegWebpQuality: 0.98 },
   },
   {
     id: 'high',
     label: 'High',
     details: 'High quality with moderate size.',
-    video: { preset: 'medium', crf: '21', audioBitrate: '160k', maxrate: '8000k', bufsize: '16000k' },
+    cloudinaryQuality: 'auto:good',
     image: { jpegWebpQuality: 0.94 },
   },
   {
     id: 'balanced',
     label: 'Balanced',
     details: 'Good quality and smaller outputs.',
-    video: { preset: 'medium', crf: '24', audioBitrate: '128k', maxrate: '5000k', bufsize: '10000k' },
+    cloudinaryQuality: 'auto:eco',
     image: { jpegWebpQuality: 0.9 },
   },
 ]
@@ -192,17 +118,8 @@ const baseName = (name) => {
   return index <= 0 ? name : name.slice(0, index)
 }
 
-const fileExt = (name) => (name.includes('.') ? name.split('.').pop()?.toLowerCase() || 'mp4' : 'mp4')
 const isVideoFile = (file) => file?.type?.startsWith('video/')
 const isImageFile = (file) => file?.type?.startsWith('image/')
-
-const buildResizeFilter = (width, height, frameMode) => {
-  if (frameMode === 'crop') {
-    return `scale=${width}:${height}:force_original_aspect_ratio=increase:force_divisible_by=2:flags=lanczos,crop=${width}:${height},setsar=1`
-  }
-
-  return `scale=${width}:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`
-}
 
 const calculateImageDrawRect = ({ sourceWidth, sourceHeight, targetWidth, targetHeight, frameMode }) => {
   const scale =
@@ -231,6 +148,67 @@ const loadImage = (sourceUrl) =>
     image.src = sourceUrl
   })
 
+// Inject fl_attachment into a Cloudinary URL so it forces a file download
+const toDownloadUrl = (url) => {
+  if (!url || url.startsWith('blob:')) return url
+  return url.replace('/upload/', '/upload/fl_attachment/')
+}
+
+// Upload a video file directly to Cloudinary from the browser using an unsigned preset.
+// onProgress(0–75) tracks upload; caller sets 100 on success.
+const uploadToCloudinary = (file, eagerTransform, onProgress) =>
+  new Promise((resolve, reject) => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+
+    if (!cloudName || !uploadPreset) {
+      reject(new Error('Cloudinary is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to your .env.local file.'))
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', uploadPreset)
+    formData.append('eager', eagerTransform)
+    formData.append('eager_async', 'false')
+
+    const xhr = new XMLHttpRequest()
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 75))
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          if (data.error) {
+            reject(new Error(data.error.message || 'Processing failed'))
+          } else {
+            resolve(data)
+          }
+        } catch {
+          reject(new Error('Invalid response from Cloudinary'))
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText)
+          reject(new Error(err.error?.message || `Upload failed (${xhr.status})`))
+        } catch {
+          reject(new Error(`Upload failed (${xhr.status})`))
+        }
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')))
+    xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')))
+
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`)
+    xhr.send(formData)
+  })
+
 function App() {
   const [selectedTool, setSelectedTool] = useState('compress')
   const [selectedFile, setSelectedFile] = useState(null)
@@ -241,20 +219,12 @@ function App() {
   const [resizeQualityId, setResizeQualityId] = useState(RESIZE_QUALITY_PRESETS[0].id)
   const [resizeFrameMode, setResizeFrameMode] = useState(RESIZE_FRAME_MODES[0].id)
   const [imageOutputId, setImageOutputId] = useState(IMAGE_OUTPUT_FORMATS[0].id)
-  const [isEngineLoading, setIsEngineLoading] = useState(false)
-  const [isEngineReady, setIsEngineReady] = useState(false)
-  const [isEngineFailed, setIsEngineFailed] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
-  const [isEngineSlow, setIsEngineSlow] = useState(false)
   const [result, setResult] = useState(null)
   const [isDropActive, setIsDropActive] = useState(false)
-
-  const ffmpegRef = useRef(new FFmpeg())
-  const loadPromiseRef = useRef(null)
-  const lastFfmpegLogRef = useRef('')
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -282,13 +252,10 @@ function App() {
     if (selectedTool === 'resize') return resizeMediaType === 'image' ? 'image/*' : 'video/*'
     return 'video/*,image/*'
   }, [selectedTool, resizeMediaType, compressMediaType])
-  const needsVideoEngine =
-    (selectedTool === 'compress' && compressMediaType === 'video') ||
-    (selectedTool === 'resize' && resizeMediaType === 'video')
 
   const clearResult = () => {
     setResult((previous) => {
-      if (previous?.url) URL.revokeObjectURL(previous.url)
+      if (previous?.url?.startsWith('blob:')) URL.revokeObjectURL(previous.url)
       return null
     })
   }
@@ -306,29 +273,9 @@ function App() {
     return { delta, percentage }
   }, [selectedFile, result])
 
-  useEffect(() => {
-    const ffmpeg = ffmpegRef.current
-    const onProgress = ({ progress: nextProgress }) => {
-      if (!Number.isFinite(nextProgress)) return
-      setProgress(Math.max(0, Math.min(100, Math.round(nextProgress * 100))))
-    }
-    const onLog = ({ message }) => {
-      if (typeof message === 'string' && message.trim()) {
-        lastFfmpegLogRef.current = message.trim()
-      }
-    }
-    ffmpeg.on('progress', onProgress)
-    ffmpeg.on('log', onLog)
-    return () => {
-      ffmpeg.off('progress', onProgress)
-      ffmpeg.off('log', onLog)
-      ffmpeg.terminate()
-    }
-  }, [])
-
   useEffect(
     () => () => {
-      if (result?.url) URL.revokeObjectURL(result.url)
+      if (result?.url?.startsWith('blob:')) URL.revokeObjectURL(result.url)
     },
     [result],
   )
@@ -336,7 +283,6 @@ function App() {
   useEffect(() => {
     setSelectedFile(null)
     setErrorMessage('')
-    setIsEngineSlow(false)
     setProgress(0)
     setIsDropActive(false)
     clearResult()
@@ -359,67 +305,6 @@ function App() {
     setStatusMessage('This tool is coming soon.')
   }, [selectedTool, resizeMediaType, compressMediaType])
 
-  const loadEngine = useCallback(async ({ silent = false } = {}) => {
-    if (ffmpegRef.current.loaded) {
-      setIsEngineReady(true)
-      return
-    }
-    if (!loadPromiseRef.current) {
-      loadPromiseRef.current = (async () => {
-        const ffmpeg = ffmpegRef.current
-        const waitWithTimeout = (promise, label) =>
-          Promise.race([
-            promise,
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`${label} timed out after ${FFMPEG_LOAD_TIMEOUT_MS / 1000}s`)), FFMPEG_LOAD_TIMEOUT_MS),
-            ),
-          ])
-
-        setIsEngineLoading(true)
-        setIsEngineSlow(false)
-        setIsEngineFailed(false)
-
-        await waitWithTimeout(
-          ffmpeg.load({
-            coreURL: '/ffmpeg-core.js',
-            wasmURL: '/ffmpeg-core.wasm',
-            workerURL: '/ffmpeg-core.worker.js',
-          }),
-          'FFmpeg engine',
-        )
-        setIsEngineReady(true)
-      })()
-        .catch((error) => {
-          setIsEngineReady(false)
-          setIsEngineFailed(true)
-          ffmpegRef.current.terminate()
-          loadPromiseRef.current = null
-          throw error
-        })
-        .finally(() => setIsEngineLoading(false))
-    }
-    return loadPromiseRef.current
-  }, [])
-
-  useEffect(() => {
-    loadEngine({ silent: true }).catch(() => {})
-  }, [loadEngine])
-
-  useEffect(() => {
-    if (!selectedFile || !needsVideoEngine || isEngineReady || isEngineLoading || isEngineFailed) return
-    loadEngine({ silent: true }).catch(() => {})
-  }, [selectedFile, needsVideoEngine, isEngineReady, isEngineLoading, isEngineFailed, loadEngine])
-
-  useEffect(() => {
-    if (!(selectedFile && isEngineLoading && needsVideoEngine && !isEngineReady)) {
-      setIsEngineSlow(false)
-      return
-    }
-
-    const timer = setTimeout(() => setIsEngineSlow(true), ENGINE_SLOW_WARNING_MS)
-    return () => clearTimeout(timer)
-  }, [selectedFile, isEngineLoading, isEngineReady, needsVideoEngine])
-
   const validationError = (file) => {
     if (selectedTool === 'compress' && compressMediaType === 'video' && !isVideoFile(file)) {
       return 'Compress mode is set to Video, so please choose a video file.'
@@ -440,7 +325,6 @@ function App() {
     }
     setSelectedFile(file)
     setErrorMessage('')
-    setIsEngineSlow(false)
     setProgress(0)
     clearResult()
     setStatusMessage(`Selected: ${file.name}`)
@@ -469,95 +353,8 @@ function App() {
     if (file) handleIncomingFile(file)
   }
 
-  const runVideoJob = async ({
-    processingMessage,
-    outputNameSuffix,
-    outputArgs,
-    fallbackOutputArgs,
-    fallbackMessage,
-    downloadName,
-    completeMessage,
-    failMessage,
-    summary,
-  }) => {
-    if (!selectedFile || isProcessing) return
-    const ffmpeg = ffmpegRef.current
-    const now = Date.now()
-    const inputName = `input-${now}.${fileExt(selectedFile.name)}`
-    const outputName = `output-${outputNameSuffix}-${now}.mp4`
-    let success = false
-
-    setErrorMessage('')
-    clearResult()
-    setProgress(0)
-    setIsProcessing(true)
-
-    try {
-      await loadEngine()
-      setStatusMessage(processingMessage)
-
-      await ffmpeg.writeFile(inputName, await fetchFile(selectedFile))
-      let exitCode = await ffmpeg.exec([
-        '-i',
-        inputName,
-        '-map',
-        '0:v:0',
-        '-map',
-        '0:a:0?',
-        ...outputArgs,
-        outputName,
-      ])
-      if (exitCode !== 0 && Array.isArray(fallbackOutputArgs) && fallbackOutputArgs.length > 0) {
-        setStatusMessage(fallbackMessage ?? 'Retrying with compatibility mode...')
-        lastFfmpegLogRef.current = ''
-        await Promise.allSettled([ffmpeg.deleteFile(outputName)])
-        exitCode = await ffmpeg.exec([
-          '-i',
-          inputName,
-          '-map',
-          '0:v:0',
-          '-map',
-          '0:a:0?',
-          ...fallbackOutputArgs,
-          outputName,
-        ])
-      }
-      if (exitCode !== 0) throw new Error(`${failMessage} (exit code ${exitCode}).`)
-
-      const outputData = await ffmpeg.readFile(outputName)
-      if (!(outputData instanceof Uint8Array)) throw new Error('Output file unavailable.')
-
-      const blob = new Blob([outputData], { type: 'video/mp4' })
-      setResult({
-        url: URL.createObjectURL(blob),
-        fileName: downloadName,
-        sizeBytes: blob.size,
-        summary,
-      })
-
-      setStatusMessage(completeMessage)
-      success = true
-    } catch (error) {
-      const message = toErrorMessage(error, `${failMessage}.`)
-      const ffmpegHint = lastFfmpegLogRef.current ? ` Last FFmpeg log: ${lastFfmpegLogRef.current}` : ''
-      const isEngineError = message.toLowerCase().includes('timed out') ||
-        message.toLowerCase().includes('unable to load') ||
-        message.toLowerCase().includes('failed to load') ||
-        message.toLowerCase().includes('unable to fetch')
-      setErrorMessage(
-        isEngineError
-          ? 'Could not start the compression engine. Please try again or refresh the page.'
-          : `${message}${ffmpegHint}`,
-      )
-      setStatusMessage(`${failMessage}.`)
-    } finally {
-      setIsProcessing(false)
-      setProgress(success ? 100 : 0)
-      await Promise.allSettled([ffmpeg.deleteFile(inputName), ffmpeg.deleteFile(outputName)])
-    }
-  }
-
   const handleCompress = async () => {
+    // ── Image compression (Canvas API, browser-side) ──────────────────────
     if (compressMediaType === 'image') {
       if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
         setErrorMessage('Please select an image file first.')
@@ -623,23 +420,44 @@ function App() {
       return
     }
 
+    // ── Video compression (Cloudinary server-side) ────────────────────────
     if (!selectedFile || !isVideoFile(selectedFile)) {
       setErrorMessage('Please select a video file first.')
       return
     }
 
-    const outputName = `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.mp4`
-    await runVideoJob({
-      processingMessage: `Compressing with ${compressionPreset.label} preset...`,
-      outputNameSuffix: `compressed-${compressionPreset.id}`,
-      outputArgs: compressionPreset.ffmpegArgs,
-      fallbackOutputArgs: COMPATIBILITY_VIDEO_ARGS,
-      fallbackMessage: 'Retrying with compatibility video mode...',
-      downloadName: outputName,
-      completeMessage: 'Compression complete. Download is ready.',
-      failMessage: 'Compression failed',
-      summary: `Preset: ${compressionPreset.label}`,
-    })
+    setErrorMessage('')
+    clearResult()
+    setProgress(0)
+    setIsProcessing(true)
+
+    try {
+      setStatusMessage(`Uploading to Cloudinary (${compressionPreset.label} preset)...`)
+      const { quality, width } = compressionPreset.cloudinary
+      const eagerTransform = `w_${width},c_scale,q_${quality},vc_auto,f_mp4`
+
+      const data = await uploadToCloudinary(selectedFile, eagerTransform, setProgress)
+      setProgress(90)
+      setStatusMessage('Finalising compressed video...')
+
+      const compressed = data.eager?.[0]
+      if (!compressed) throw new Error('No compressed output received from Cloudinary.')
+
+      setResult({
+        url: compressed.secure_url,
+        fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.mp4`,
+        sizeBytes: compressed.bytes,
+        summary: `Preset: ${compressionPreset.label}`,
+      })
+      setProgress(100)
+      setStatusMessage('Compression complete. Download is ready.')
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error, 'Compression failed.'))
+      setStatusMessage('Compression failed.')
+      setProgress(0)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const handleResizeVideo = async () => {
@@ -647,43 +465,41 @@ function App() {
       setErrorMessage('Please select a video file for video resize mode.')
       return
     }
-    const outputName = `${baseName(selectedFile.name)}-${resizePreset.id}-${resizeFrameMode}-${resizeQualityId}-${resizePreset.width}x${resizePreset.height}.mp4`
-    await runVideoJob({
-      processingMessage: `Resizing video (${resizeFrame.label}, ${resizeQuality.label}) for ${resizePreset.label}...`,
-      outputNameSuffix: `resized-${resizePreset.id}`,
-      outputArgs: [
-        '-vf',
-        buildResizeFilter(resizePreset.width, resizePreset.height, resizeFrameMode),
-        '-r',
-        '30',
-        '-c:v',
-        'libx264',
-        '-preset',
-        resizeQuality.video.preset,
-        '-crf',
-        resizeQuality.video.crf,
-        '-maxrate',
-        resizeQuality.video.maxrate,
-        '-bufsize',
-        resizeQuality.video.bufsize,
-        '-profile:v',
-        'high',
-        '-pix_fmt',
-        'yuv420p',
-        '-movflags',
-        '+faststart',
-        '-c:a',
-        'aac',
-        '-b:a',
-        resizeQuality.video.audioBitrate,
-        '-ar',
-        '48000',
-      ],
-      downloadName: outputName,
-      completeMessage: 'Video resize complete. Quality-first output is ready.',
-      failMessage: 'Video resize failed',
-      summary: `Target: ${resizePreset.width}x${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
-    })
+
+    setErrorMessage('')
+    clearResult()
+    setProgress(0)
+    setIsProcessing(true)
+
+    try {
+      setStatusMessage(`Uploading video for ${resizePreset.label} resize...`)
+
+      const cropMode = resizeFrameMode === 'crop' ? 'fill' : 'pad'
+      const bgParam = resizeFrameMode === 'crop' ? '' : ',b_black'
+      const eagerTransform = `w_${resizePreset.width},h_${resizePreset.height},c_${cropMode}${bgParam},g_center,q_${resizeQuality.cloudinaryQuality},vc_auto,f_mp4`
+
+      const data = await uploadToCloudinary(selectedFile, eagerTransform, setProgress)
+      setProgress(90)
+      setStatusMessage('Finalising resized video...')
+
+      const transformed = data.eager?.[0]
+      if (!transformed) throw new Error('No output received from Cloudinary.')
+
+      setResult({
+        url: transformed.secure_url,
+        fileName: `${baseName(selectedFile.name)}-${resizePreset.id}-${resizeFrameMode}-${resizePreset.width}x${resizePreset.height}.mp4`,
+        sizeBytes: transformed.bytes,
+        summary: `${resizePreset.width}×${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
+      })
+      setProgress(100)
+      setStatusMessage('Video resize complete. Download is ready.')
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error, 'Video resize failed.'))
+      setStatusMessage('Video resize failed.')
+      setProgress(0)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const handleResizeImage = async () => {
@@ -770,12 +586,7 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  // Spinner only shows while actively loading AND before the slow-warning kicks in
-  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && isEngineLoading && !isEngineReady && !isEngineSlow
-  // Timeout warning shows after 30 s (isEngineSlow) – replaces spinner
-  const showEngineTimeoutWarning = Boolean(selectedFile) && needsVideoEngine && isEngineSlow && !isEngineReady
-  const showEngineFailedWarning = Boolean(selectedFile) && needsVideoEngine && isEngineFailed && !isEngineReady
-  const showEngineLoadingUI = showEnginePrepIndicator
+
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
     if (isProcessing) return { text: progressPercent > 0 ? `Compressing... ${progressPercent}%` : 'Starting...', disabled: true }
@@ -840,14 +651,14 @@ function App() {
             your <span className="hero-title-accent">videos.</span>
           </h1>
           <p className="hero-sub">
-            Compress, resize, and optimize videos and images for WhatsApp, TikTok and Instagram Reels — all inside your browser. Instant. Private. Free.
+            Compress, resize, and optimize videos and images for WhatsApp, TikTok and Instagram Reels — fast, server-side processing. Instant results. Free.
           </p>
           <div className="hero-trust">
             <span className="hero-trust-item">
               <svg viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M11.484 2.17a.75.75 0 0 1 1.032 0 11.209 11.209 0 0 0 7.877 3.08.75.75 0 0 1 .722.515 12.74 12.74 0 0 1 .635 3.985c0 5.942-4.064 10.933-9.563 12.348a.749.749 0 0 1-.374 0C6.314 20.683 2.25 15.692 2.25 9.75c0-1.39.223-2.73.635-3.985a.75.75 0 0 1 .722-.516l.143.001c2.996 0 5.718-1.17 7.734-3.08ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
               </svg>
-              Files stay private
+              Secure cloud processing
             </span>
             <span className="hero-trust-sep" />
             <span className="hero-trust-item">
@@ -967,13 +778,15 @@ function App() {
                     </label>
                     {showLargeFileWarning && (
                       <div className="large-file-warning">
-                        <strong>⚠️ Large file detected ({largeFileSizeMB} MB).</strong> Compression may take 2-3 minutes in-browser. For faster results, try a file under 200MB.
+                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 200 MB may be rejected. For best results, use a file under 200 MB.
                       </div>
                     )}
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          Compressing... {progressPercent}%
+                          {compressMediaType === 'video' && progressPercent < 76
+                            ? `Uploading... ${progressPercent}%`
+                            : `Compressing... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -1038,7 +851,7 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <a href={result.url} download={result.fileName} className="download-btn">
+                        <a href={toDownloadUrl(result.url)} download={result.fileName} target="_blank" rel="noreferrer" className="download-btn">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           Download File
                         </a>
@@ -1148,13 +961,15 @@ function App() {
                     </label>
                     {showLargeFileWarning && (
                       <div className="large-file-warning">
-                        <strong>⚠️ Large file detected ({largeFileSizeMB} MB).</strong> Compression may take 2-3 minutes in-browser. For faster results, try a file under 200MB.
+                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 200 MB may be rejected. For best results, use a file under 200 MB.
                       </div>
                     )}
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          Processing... {progressPercent}%
+                          {resizeMediaType === 'video' && progressPercent < 76
+                            ? `Uploading... ${progressPercent}%`
+                            : `Processing... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -1211,7 +1026,7 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <a href={result.url} download={result.fileName} className="download-btn">
+                        <a href={toDownloadUrl(result.url)} download={result.fileName} target="_blank" rel="noreferrer" className="download-btn">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
                           Download File
                         </a>
@@ -1266,7 +1081,7 @@ function App() {
               <div className="step-number">2</div>
               <div>
                 <p className="step-title">Upload your file</p>
-                <p className="step-body">Drop a video or image directly into the browser. Nothing ever leaves your device.</p>
+                <p className="step-body">Drop a video or image directly into the browser. Videos are processed securely on our servers.</p>
               </div>
             </div>
             <div className="how-step">
@@ -1290,7 +1105,7 @@ function App() {
               </svg>
             </div>
             <p className="footer-brand-name">iLoveVideo</p>
-            <p className="footer-tagline">Compress and resize media for social platforms in seconds. Free, private, browser-powered.</p>
+            <p className="footer-tagline">Compress and resize media for social platforms in seconds. Free, fast, cloud-powered.</p>
           </div>
           <div>
             <p className="footer-col-label">Tools</p>
