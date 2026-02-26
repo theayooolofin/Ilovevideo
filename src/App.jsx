@@ -13,12 +13,9 @@ const resolveCoreURLs = async () => {
   for (const source of FFMPEG_CORE_CANDIDATES) {
     try {
       if (source.type === 'local') {
-        const coreURL = `${source.baseURL}/ffmpeg-core.js`
-        const wasmURL = `${source.baseURL}/ffmpeg-core.wasm`
-        const check = await fetch(coreURL, { method: 'HEAD' })
-        if (!check.ok && check.status !== 405) {
-          throw new Error(`Local FFmpeg core unavailable (${check.status}).`)
-        }
+        const base = `${window.location.origin}${source.baseURL}`
+        const coreURL = await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript')
+        const wasmURL = await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm')
         return { coreURL, wasmURL }
       }
 
