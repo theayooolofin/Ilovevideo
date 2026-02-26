@@ -1,30 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { fetchFile } from '@ffmpeg/util'
+import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
-const FFMPEG_CORE_VERSION = '20260226-1'
-const FFMPEG_CORE_CANDIDATES = [
-  {
-    id: 'local',
-    coreURL: `/ffmpeg/ffmpeg-core.js?v=${FFMPEG_CORE_VERSION}`,
-    wasmURL: `/ffmpeg/ffmpeg-core.wasm?v=${FFMPEG_CORE_VERSION}`,
-  },
-  {
-    id: 'jsdelivr',
-    coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js',
-    wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm',
-  },
-  {
-    id: 'unpkg',
-    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js',
-    wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.wasm',
-  },
+const FFMPEG_MT_CORE_BASE_URLS = [
+  { id: 'unpkg', baseURL: 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd' },
+  { id: 'jsdelivr', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd' },
+  { id: 'local', baseURL: '/ffmpeg' },
 ]
-const FFMPEG_LOAD_TIMEOUT_MS = 45000
+const FFMPEG_LOAD_TIMEOUT_MS = 90000
+const LARGE_FILE_THRESHOLD_BYTES = 200 * 1024 * 1024
 const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 const COMPATIBILITY_VIDEO_ARGS = [
   '-vf',
   EVEN_SCALE_FILTER,
+  '-preset',
+  'ultrafast',
   '-r',
   '30',
   '-c:v',
@@ -62,26 +52,22 @@ const COMPRESSION_PRESETS = [
     label: 'WhatsApp',
     details: 'Small files for quick sharing.',
     ffmpegArgs: [
-      '-vf',
-      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
-      'veryfast',
+      'ultrafast',
       '-crf',
-      '32',
-      '-maxrate',
-      '1200k',
-      '-bufsize',
-      '2400k',
-      '-pix_fmt',
-      'yuv420p',
+      '28',
+      '-vf',
+      'scale=-2:720',
       '-movflags',
       '+faststart',
       '-c:a',
       'aac',
       '-b:a',
       '96k',
+      '-threads',
+      '0',
     ],
   },
   {
@@ -89,26 +75,22 @@ const COMPRESSION_PRESETS = [
     label: 'Instagram Reel',
     details: 'Balanced quality and size.',
     ffmpegArgs: [
-      '-vf',
-      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
-      'medium',
+      'ultrafast',
       '-crf',
-      '26',
-      '-maxrate',
-      '4000k',
-      '-bufsize',
-      '8000k',
-      '-pix_fmt',
-      'yuv420p',
+      '23',
+      '-vf',
+      'scale=-2:1080',
       '-movflags',
       '+faststart',
       '-c:a',
       'aac',
       '-b:a',
       '128k',
+      '-threads',
+      '0',
     ],
   },
   {
@@ -116,26 +98,22 @@ const COMPRESSION_PRESETS = [
     label: 'TikTok',
     details: 'Higher quality while reducing size.',
     ffmpegArgs: [
-      '-vf',
-      EVEN_SCALE_FILTER,
       '-c:v',
       'libx264',
       '-preset',
-      'medium',
+      'ultrafast',
       '-crf',
-      '24',
-      '-maxrate',
-      '5500k',
-      '-bufsize',
-      '11000k',
-      '-pix_fmt',
-      'yuv420p',
+      '25',
+      '-vf',
+      'scale=-2:1080',
       '-movflags',
       '+faststart',
       '-c:a',
       'aac',
       '-b:a',
       '128k',
+      '-threads',
+      '0',
     ],
   },
 ]
@@ -314,7 +292,12 @@ function App() {
     })
   }
 
-  const progressPercent = Math.round(progress * 100)
+  const progressPercent = progress
+  const showLargeFileWarning =
+    Boolean(selectedFile) &&
+    Boolean(isVideoFile(selectedFile)) &&
+    selectedFile.size > LARGE_FILE_THRESHOLD_BYTES
+  const largeFileSizeMB = selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(1) : '0.0'
   const resultStats = useMemo(() => {
     if (!selectedFile || !result) return null
     const delta = selectedFile.size - result.sizeBytes
@@ -326,7 +309,7 @@ function App() {
     const ffmpeg = ffmpegRef.current
     const onProgress = ({ progress: nextProgress }) => {
       if (!Number.isFinite(nextProgress)) return
-      setProgress(Math.max(0, Math.min(1, nextProgress)))
+      setProgress(Math.max(0, Math.min(100, Math.round(nextProgress * 100))))
     }
     const onLog = ({ message }) => {
       if (typeof message === 'string' && message.trim()) {
@@ -374,7 +357,7 @@ function App() {
     setStatusMessage('This tool is coming soon.')
   }, [selectedTool, resizeMediaType, compressMediaType])
 
-  const loadEngine = async () => {
+  const loadEngine = useCallback(async ({ silent = false } = {}) => {
     if (ffmpegRef.current.loaded) {
       setIsEngineReady(true)
       return
@@ -391,17 +374,20 @@ function App() {
           ])
 
         setIsEngineLoading(true)
-        setStatusMessage('Loading FFmpeg.wasm core...')
+        if (!silent) setStatusMessage('Loading FFmpeg.wasm core...')
 
         const loadErrors = []
-        for (const candidate of FFMPEG_CORE_CANDIDATES) {
-          const coreURL = new URL(candidate.coreURL, window.location.href).toString()
-          const wasmURL = new URL(candidate.wasmURL, window.location.href).toString()
+        for (const candidate of FFMPEG_MT_CORE_BASE_URLS) {
+          const baseURL = new URL(candidate.baseURL, window.location.href).toString().replace(/\/$/, '')
           try {
-            setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
-            await waitWithTimeout(ffmpeg.load({ coreURL, wasmURL }), `FFmpeg core (${candidate.id})`)
+            if (!silent) setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
+            const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
+            const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+            const workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript')
+
+            await waitWithTimeout(ffmpeg.load({ coreURL, wasmURL, workerURL }), `FFmpeg core (${candidate.id})`)
             setIsEngineReady(true)
-            setStatusMessage('FFmpeg.wasm loaded successfully.')
+            if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
             return
           } catch (error) {
             const reason = toErrorMessage(error, 'Unknown load error')
@@ -410,7 +396,7 @@ function App() {
           }
         }
 
-        throw new Error(`Unable to load FFmpeg core. ${loadErrors.join(' | ')}`)
+        throw new Error(`Unable to load FFmpeg engine. ${loadErrors.join(' | ')}`)
       })()
         .catch((error) => {
           setIsEngineReady(false)
@@ -420,7 +406,11 @@ function App() {
         .finally(() => setIsEngineLoading(false))
     }
     return loadPromiseRef.current
-  }
+  }, [])
+
+  useEffect(() => {
+    loadEngine({ silent: true }).catch(() => {})
+  }, [loadEngine])
 
   const validationError = (file) => {
     if (selectedTool === 'compress' && compressMediaType === 'video' && !isVideoFile(file)) {
@@ -550,7 +540,7 @@ function App() {
       setStatusMessage(`${failMessage}.`)
     } finally {
       setIsProcessing(false)
-      setProgress(success ? 1 : 0)
+      setProgress(success ? 100 : 0)
       await Promise.allSettled([ffmpeg.deleteFile(inputName), ffmpeg.deleteFile(outputName)])
     }
   }
@@ -608,7 +598,7 @@ function App() {
           summary: `Optimized for ${compressionPreset.label} | ${targetWidth}x${targetHeight}`,
         })
         setStatusMessage('Image optimization complete. Download is ready.')
-        setProgress(1)
+        setProgress(100)
       } catch (error) {
         setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
         setStatusMessage('Image optimization failed.')
@@ -741,7 +731,7 @@ function App() {
       })
 
       setStatusMessage('Image resize complete. High-quality output is ready.')
-      setProgress(1)
+      setProgress(100)
     } catch (error) {
       setErrorMessage(toErrorMessage(error, 'Image resize failed.'))
       setStatusMessage('Image resize failed.')
@@ -768,15 +758,8 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  const activeProfile = isCompressTool
-    ? `${compressionPreset.label} ${compressMediaType} optimization`
-    : `${resizePreset.label} (${resizePreset.width}x${resizePreset.height}) ${resizeMediaType} resize | ${resizeFrame.label} | ${resizeQuality.label}`
-  const engineState =
-    (isResizeTool && resizeMediaType === 'image') || (isCompressTool && compressMediaType === 'image')
-      ? 'Not needed for image mode'
-      : isEngineReady
-        ? 'Loaded and ready'
-        : 'Loads on first video operation'
+  const needsVideoEngine =
+    (isCompressTool && compressMediaType === 'video') || (isResizeTool && resizeMediaType === 'video')
   const modeLabel = isCompressTool
     ? compressMediaType === 'video'
       ? 'Video File'
@@ -879,6 +862,11 @@ function App() {
       {/* ── Tool Panel ── */}
       <div className="panel-wrap">
         <section id="tool-panel" className="tool-panel">
+          {isProcessing && (
+            <div className="panel-progress-top" aria-hidden="true">
+              <div className="panel-progress-top-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
+          )}
           {activeToolImplemented ? (
             <div className="space-y-6">
 
@@ -897,6 +885,9 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
+                  {!isEngineReady && needsVideoEngine && (
+                    <p className="engine-prep-note">⚡ Preparing engine...</p>
+                  )}
 
                   {/* Media Toggle */}
                   <div>
@@ -947,6 +938,21 @@ function App() {
                         </>
                       )}
                     </label>
+                    {showLargeFileWarning && (
+                      <div className="large-file-warning">
+                        <strong>⚠️ Large file detected ({largeFileSizeMB} MB).</strong> Compression may take 2-3 minutes in-browser. For faster results, try a file under 200MB.
+                      </div>
+                    )}
+                    {isProcessing && (
+                      <div className="progress-wrap">
+                        <p className="progress-live-label">
+                          Compressing... {progressPercent}%
+                        </p>
+                        <div className="progress-track">
+                          <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Platform Presets */}
@@ -982,29 +988,19 @@ function App() {
                   <button
                     type="button"
                     onClick={handleCompress}
-                    disabled={!selectedFile || isProcessing || isEngineLoading}
+                    disabled={!selectedFile || isProcessing}
                     className="action-btn"
                   >
-                    {(isProcessing || isEngineLoading) && <span className="action-spinner" />}
+                    {(isProcessing || (isEngineLoading && !isEngineReady && needsVideoEngine)) && (
+                      <span className="action-spinner" />
+                    )}
                     {isProcessing
                       ? `Processing… ${progressPercent}%`
-                      : isEngineLoading
+                      : isEngineLoading && !isEngineReady && needsVideoEngine
                         ? 'Loading Engine…'
                         : `Compress ${compressMediaType === 'video' ? 'Video' : 'Image'} →`}
                   </button>
-
-                  {/* Progress */}
-                  {(isProcessing || progress > 0) && (
-                    <div className="progress-wrap">
-                      <div className="progress-label">
-                        <span>Processing</span>
-                        <span>{progressPercent}%</span>
-                      </div>
-                      <div className="progress-track">
-                        <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-                      </div>
-                    </div>
-                  )}
+                  <p className="status-line">{statusMessage}</p>
 
                   {/* Output Card */}
                   {result && (
@@ -1057,6 +1053,9 @@ function App() {
                     </div>
                   </div>
                   <div className="panel-divider" />
+                  {!isEngineReady && needsVideoEngine && (
+                    <p className="engine-prep-note">⚡ Preparing engine...</p>
+                  )}
 
                   {/* Media Toggle */}
                   <div>
@@ -1127,6 +1126,21 @@ function App() {
                         </>
                       )}
                     </label>
+                    {showLargeFileWarning && (
+                      <div className="large-file-warning">
+                        <strong>⚠️ Large file detected ({largeFileSizeMB} MB).</strong> Compression may take 2-3 minutes in-browser. For faster results, try a file under 200MB.
+                      </div>
+                    )}
+                    {isProcessing && (
+                      <div className="progress-wrap">
+                        <p className="progress-live-label">
+                          Processing... {progressPercent}%
+                        </p>
+                        <div className="progress-track">
+                          <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Target Canvas */}
@@ -1154,29 +1168,19 @@ function App() {
                   <button
                     type="button"
                     onClick={handleResize}
-                    disabled={!selectedFile || isProcessing || isEngineLoading}
+                    disabled={!selectedFile || isProcessing}
                     className="action-btn"
                   >
-                    {(isProcessing || isEngineLoading) && <span className="action-spinner" />}
+                    {(isProcessing || (isEngineLoading && !isEngineReady && needsVideoEngine)) && (
+                      <span className="action-spinner" />
+                    )}
                     {isProcessing
                       ? `Processing… ${progressPercent}%`
-                      : isEngineLoading
+                      : isEngineLoading && !isEngineReady && needsVideoEngine
                         ? 'Loading Engine…'
                         : `Resize ${resizeMediaType === 'video' ? 'Video' : 'Image'} →`}
                   </button>
-
-                  {/* Progress */}
-                  {(isProcessing || progress > 0) && (
-                    <div className="progress-wrap">
-                      <div className="progress-label">
-                        <span>Processing</span>
-                        <span>{progressPercent}%</span>
-                      </div>
-                      <div className="progress-track">
-                        <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-                      </div>
-                    </div>
-                  )}
+                  <p className="status-line">{statusMessage}</p>
 
                   {/* Output Card */}
                   {result && (

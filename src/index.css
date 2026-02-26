@@ -415,6 +415,7 @@ button, a, input, select, textarea, label {
   box-shadow: var(--shadow-md);
   padding: 32px;
   transition: box-shadow 0.25s ease;
+  overflow: hidden;
 }
 
 .tool-panel:hover {
@@ -463,6 +464,18 @@ button, a, input, select, textarea, label {
   height: 1px;
   background: var(--clr-border);
   margin: 0 0 24px;
+}
+
+.engine-prep-note {
+  margin: -10px 0 18px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.status-line {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 /* ─────────────────────────────────────────
@@ -619,6 +632,17 @@ button, a, input, select, textarea, label {
   letter-spacing: 0.02em;
 }
 
+.large-file-warning {
+  margin-top: 12px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* ─────────────────────────────────────────
    PRESET CARDS GRID
 ───────────────────────────────────────── */
@@ -757,20 +781,31 @@ button, a, input, select, textarea, label {
   margin-top: 16px;
 }
 
-.progress-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--clr-muted);
-  margin-bottom: 6px;
+.progress-live-label {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.panel-progress-top {
+  margin: -32px -32px 20px;
+  height: 3px;
+  width: calc(100% + 64px);
+  background: #dbeafe;
+}
+
+.panel-progress-top-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width 0.25s ease;
 }
 
 .progress-track {
-  height: 8px;
+  height: 6px;
   border-radius: var(--r-full);
   overflow: hidden;
-  background: #e2e8f0;
+  background: #dbeafe;
 }
 
 .progress-fill {
@@ -1106,6 +1141,11 @@ button, a, input, select, textarea, label {
 
   .tool-panel {
     padding: 24px 20px;
+  }
+
+  .panel-progress-top {
+    margin: -24px -20px 16px;
+    width: calc(100% + 40px);
   }
 
   .preset-grid {
