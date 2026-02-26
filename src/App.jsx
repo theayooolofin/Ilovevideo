@@ -769,20 +769,24 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const activeToolImplemented = isCompressTool || isResizeTool
-  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && isEngineLoading && !isEngineReady
+  // Spinner only shows while actively loading AND before the slow-warning kicks in
+  const showEnginePrepIndicator = Boolean(selectedFile) && needsVideoEngine && isEngineLoading && !isEngineReady && !isEngineSlow
+  // Timeout warning shows after 30 s (isEngineSlow) – replaces spinner
   const showEngineTimeoutWarning = Boolean(selectedFile) && needsVideoEngine && isEngineSlow && !isEngineReady
   const showEngineFailedWarning = Boolean(selectedFile) && needsVideoEngine && isEngineFailed && !isEngineReady
   const showEngineLoadingUI = showEnginePrepIndicator
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    if (compressMediaType === 'video' && isEngineLoading && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    // Keep disabled only while loading AND before the 30-s slow-warning.
+    // Once isEngineSlow, unlock so the user can proceed (loading continues in background).
+    if (compressMediaType === 'video' && isEngineLoading && !isEngineReady && !isEngineSlow) return { text: 'Preparing Engine... ⚡', disabled: true }
     if (isProcessing) return { text: `Compressing... ${progressPercent}%`, disabled: true }
     if (compressMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
   }
   const getResizeButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    if (resizeMediaType === 'video' && isEngineLoading && !isEngineReady) return { text: 'Preparing Engine... ⚡', disabled: true }
+    if (resizeMediaType === 'video' && isEngineLoading && !isEngineReady && !isEngineSlow) return { text: 'Preparing Engine... ⚡', disabled: true }
     if (isProcessing) return { text: `Processing... ${progressPercent}%`, disabled: true }
     if (resizeMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
@@ -1000,7 +1004,7 @@ function App() {
                               </span>
                             )}
                             <span className="preset-card-emoji">
-                              {preset.id === 'whatsapp' ? '💬' : preset.id === 'instagram-reel' ? '📸' : '🎵'}
+                              {preset.id === 'whatsapp' ? '💬' : preset.id === 'instagram-reel' ? '📸' : '🎬'}
                             </span>
                             <p className="preset-card-name">{preset.label}</p>
                             <p className="preset-card-info">{preset.details}</p>
