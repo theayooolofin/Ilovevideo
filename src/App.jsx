@@ -378,7 +378,6 @@ function App() {
         setIsEngineLoading(true)
         setIsEngineSlow(false)
         setIsEngineFailed(false)
-        if (!silent) setStatusMessage('Loading FFmpeg.wasm core...')
 
         await waitWithTimeout(
           ffmpeg.load({
@@ -389,7 +388,6 @@ function App() {
           'FFmpeg engine',
         )
         setIsEngineReady(true)
-        if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
       })()
         .catch((error) => {
           setIsEngineReady(false)
@@ -542,10 +540,13 @@ function App() {
     } catch (error) {
       const message = toErrorMessage(error, `${failMessage}.`)
       const ffmpegHint = lastFfmpegLogRef.current ? ` Last FFmpeg log: ${lastFfmpegLogRef.current}` : ''
-      const engineBlocked = message.includes('Unable to load FFmpeg engine')
+      const isEngineError = message.toLowerCase().includes('timed out') ||
+        message.toLowerCase().includes('unable to load') ||
+        message.toLowerCase().includes('failed to load') ||
+        message.toLowerCase().includes('unable to fetch')
       setErrorMessage(
-        engineBlocked
-          ? `${message} Check internet/ad-blocker settings and retry.${ffmpegHint}`
+        isEngineError
+          ? 'Could not start the compression engine. Please try again or refresh the page.'
           : `${message}${ffmpegHint}`,
       )
       setStatusMessage(`${failMessage}.`)
@@ -777,17 +778,13 @@ function App() {
   const showEngineLoadingUI = showEnginePrepIndicator
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    // Keep disabled only while loading AND before the 30-s slow-warning.
-    // Once isEngineSlow, unlock so the user can proceed (loading continues in background).
-    if (compressMediaType === 'video' && isEngineLoading && !isEngineReady && !isEngineSlow) return { text: 'Preparing Engine... ⚡', disabled: true }
-    if (isProcessing) return { text: `Compressing... ${progressPercent}%`, disabled: true }
+    if (isProcessing) return { text: progressPercent > 0 ? `Compressing... ${progressPercent}%` : 'Starting...', disabled: true }
     if (compressMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
   }
   const getResizeButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
-    if (resizeMediaType === 'video' && isEngineLoading && !isEngineReady && !isEngineSlow) return { text: 'Preparing Engine... ⚡', disabled: true }
-    if (isProcessing) return { text: `Processing... ${progressPercent}%`, disabled: true }
+    if (isProcessing) return { text: progressPercent > 0 ? `Processing... ${progressPercent}%` : 'Starting...', disabled: true }
     if (resizeMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
   }
@@ -1014,29 +1011,6 @@ function App() {
                     </div>
                   </div>
 
-                  {showEnginePrepIndicator && compressMediaType === 'video' && (
-                    <div className="engine-prep-inline" role="status" aria-live="polite">
-                      <span className="engine-prep-inline-spinner" />
-                      <span>⚡ Preparing compression engine...</span>
-                    </div>
-                  )}
-                  {showEngineTimeoutWarning && compressMediaType === 'video' && (
-                    <div className="engine-timeout-warning">
-                      <span>⚠️ Engine is taking longer than usual. Check your connection and refresh the page.</span>{' '}
-                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
-                        Refresh Page
-                      </button>
-                    </div>
-                  )}
-                  {showEngineFailedWarning && compressMediaType === 'video' && (
-                    <div className="engine-timeout-warning">
-                      <span>⚠️ Engine failed to load. Tap Process Video to retry, or refresh the page.</span>{' '}
-                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
-                        Refresh Page
-                      </button>
-                    </div>
-                  )}
-
                   {/* Action Button */}
                   <button
                     type="button"
@@ -1044,7 +1018,7 @@ function App() {
                     disabled={compressButtonState.disabled}
                     className="action-btn"
                   >
-                    {(isProcessing || showEngineLoadingUI) && (
+                    {isProcessing && (
                       <span className="action-spinner" />
                     )}
                     {compressButtonState.text}
@@ -1210,29 +1184,6 @@ function App() {
                     </div>
                   )}
 
-                  {showEnginePrepIndicator && resizeMediaType === 'video' && (
-                    <div className="engine-prep-inline" role="status" aria-live="polite">
-                      <span className="engine-prep-inline-spinner" />
-                      <span>⚡ Preparing compression engine...</span>
-                    </div>
-                  )}
-                  {showEngineTimeoutWarning && resizeMediaType === 'video' && (
-                    <div className="engine-timeout-warning">
-                      <span>⚠️ Engine is taking longer than usual. Check your connection and refresh the page.</span>{' '}
-                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
-                        Refresh Page
-                      </button>
-                    </div>
-                  )}
-                  {showEngineFailedWarning && resizeMediaType === 'video' && (
-                    <div className="engine-timeout-warning">
-                      <span>⚠️ Engine failed to load. Tap Process Video to retry, or refresh the page.</span>{' '}
-                      <button type="button" className="engine-timeout-link" onClick={() => window.location.reload()}>
-                        Refresh Page
-                      </button>
-                    </div>
-                  )}
-
                   {/* Action Button */}
                   <button
                     type="button"
@@ -1240,7 +1191,7 @@ function App() {
                     disabled={resizeButtonState.disabled}
                     className="action-btn"
                   >
-                    {(isProcessing || showEngineLoadingUI) && (
+                    {isProcessing && (
                       <span className="action-spinner" />
                     )}
                     {resizeButtonState.text}
