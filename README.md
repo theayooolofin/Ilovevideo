@@ -62,6 +62,7 @@ Set these GitHub repository secrets:
 - `HOSTINGER_FTP_HOST` (example: `ftp.ilovevideo.fun` or your Hostinger FTP host)
 - `HOSTINGER_FTP_USERNAME`
 - `HOSTINGER_FTP_PASSWORD`
+- `HOSTINGER_FTP_SERVER_DIR` (optional, defaults to `/public_html/`)
 
 How to set secrets:
 1. Open your GitHub repo -> `Settings`
@@ -70,6 +71,10 @@ How to set secrets:
 4. Add all three secrets above
 
 After that, every push to `main` deploys automatically.
+
+Notes:
+- Workflow tries `FTPS` first, then falls back to `FTP` if needed.
+- If your website root is not `/public_html/`, set `HOSTINGER_FTP_SERVER_DIR` to the exact folder (for example `/domains/ilovevideo.fun/public_html/`).
 
 ## Notes
 

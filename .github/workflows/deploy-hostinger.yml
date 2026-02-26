@@ -16,6 +16,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      HOSTINGER_SERVER_DIR: ${{ secrets.HOSTINGER_FTP_SERVER_DIR || '/public_html/' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,7 +34,9 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Deploy dist to Hostinger via FTP
+      - name: Deploy dist to Hostinger via FTPS
+        id: deploy_ftps
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.HOSTINGER_FTP_HOST }}
@@ -41,4 +45,16 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: ./dist/
-          server-dir: /public_html/
+          server-dir: ${{ env.HOSTINGER_SERVER_DIR }}
+
+      - name: Deploy dist to Hostinger via FTP fallback
+        if: steps.deploy_ftps.outcome == 'failure'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_HOST }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          local-dir: ./dist/
+          server-dir: ${{ env.HOSTINGER_SERVER_DIR }}
