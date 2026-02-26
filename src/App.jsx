@@ -2,8 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile } from '@ffmpeg/util'
 
+const FFMPEG_CORE_VERSION = '20260226-1'
 const FFMPEG_CORE_CANDIDATES = [
-  { id: 'local', coreURL: '/ffmpeg/ffmpeg-core.js', wasmURL: '/ffmpeg/ffmpeg-core.wasm' },
+  {
+    id: 'local',
+    coreURL: `/ffmpeg/ffmpeg-core.js?v=${FFMPEG_CORE_VERSION}`,
+    wasmURL: `/ffmpeg/ffmpeg-core.wasm?v=${FFMPEG_CORE_VERSION}`,
+  },
   {
     id: 'jsdelivr',
     coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js',
