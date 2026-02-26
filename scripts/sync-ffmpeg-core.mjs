@@ -8,11 +8,11 @@ const rootDir = resolve(__dirname, '..')
 
 const sources = [
   {
-    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd', 'ffmpeg-core.js'),
+    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'esm', 'ffmpeg-core.js'),
     dest: resolve(rootDir, 'public', 'ffmpeg', 'ffmpeg-core.js'),
   },
   {
-    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd', 'ffmpeg-core.wasm'),
+    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'esm', 'ffmpeg-core.wasm'),
     dest: resolve(rootDir, 'public', 'ffmpeg', 'ffmpeg-core.wasm'),
   },
 ]

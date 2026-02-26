@@ -4,8 +4,8 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 const FFMPEG_CORE_CANDIDATES = [
   { type: 'local', baseURL: '/ffmpeg' },
-  { type: 'remote', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd' },
-  { type: 'remote', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd' },
+  { type: 'remote', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm' },
+  { type: 'remote', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm' },
 ]
 const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 const COMPATIBILITY_VIDEO_ARGS = [
