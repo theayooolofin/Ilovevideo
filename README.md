@@ -48,6 +48,29 @@ npm run build
 
 4. Open `https://ilovevideo.fun` and hard refresh (`Ctrl+F5`).
 
+## Auto Deploy from GitHub to Hostinger
+
+This repository includes a GitHub Actions workflow at:
+- `.github/workflows/deploy-hostinger.yml`
+
+What it does:
+- Triggers on every push to `main` (and manual run)
+- Runs `npm ci` + `npm run build`
+- Uploads `dist/` to `/public_html/` on Hostinger
+
+Set these GitHub repository secrets:
+- `HOSTINGER_FTP_HOST` (example: `ftp.ilovevideo.fun` or your Hostinger FTP host)
+- `HOSTINGER_FTP_USERNAME`
+- `HOSTINGER_FTP_PASSWORD`
+
+How to set secrets:
+1. Open your GitHub repo -> `Settings`
+2. Go to `Secrets and variables` -> `Actions`
+3. Click `New repository secret`
+4. Add all three secrets above
+
+After that, every push to `main` deploys automatically.
+
 ## Notes
 
 - `.htaccess` enables SPA fallback and cache headers on Apache hosting.
