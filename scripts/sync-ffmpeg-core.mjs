@@ -19,6 +19,14 @@ const sources = [
     src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core-mt', 'dist', 'umd', 'ffmpeg-core.worker.js'),
     dest: resolve(rootDir, 'public', 'ffmpeg', 'ffmpeg-core.worker.js'),
   },
+  {
+    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd', 'ffmpeg-core.js'),
+    dest: resolve(rootDir, 'public', 'ffmpeg-single', 'ffmpeg-core.js'),
+  },
+  {
+    src: resolve(rootDir, 'node_modules', '@ffmpeg', 'core', 'dist', 'umd', 'ffmpeg-core.wasm'),
+    dest: resolve(rootDir, 'public', 'ffmpeg-single', 'ffmpeg-core.wasm'),
+  },
 ]
 
 for (const { src, dest } of sources) {
@@ -26,4 +34,4 @@ for (const { src, dest } of sources) {
   await copyFile(src, dest)
 }
 
-console.log('FFmpeg core synced to public/ffmpeg')
+console.log('FFmpeg cores synced to public/ffmpeg and public/ffmpeg-single')

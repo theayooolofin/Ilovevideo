@@ -7,7 +7,12 @@ const FFMPEG_MT_CORE_BASE_URLS = [
   { id: 'jsdelivr', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd' },
   { id: 'local', baseURL: '/ffmpeg' },
 ]
-const FFMPEG_LOAD_TIMEOUT_MS = 90000
+const FFMPEG_ST_CORE_BASE_URLS = [
+  { id: 'local-compat', baseURL: '/ffmpeg-single' },
+  { id: 'unpkg-compat', baseURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd' },
+  { id: 'jsdelivr-compat', baseURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd' },
+]
+const FFMPEG_LOAD_TIMEOUT_MS = 180000
 const LARGE_FILE_THRESHOLD_BYTES = 200 * 1024 * 1024
 const EVEN_SCALE_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
 const COMPATIBILITY_VIDEO_ARGS = [
@@ -365,6 +370,25 @@ function App() {
     if (!loadPromiseRef.current) {
       loadPromiseRef.current = (async () => {
         const ffmpeg = ffmpegRef.current
+        const buildCoreConfig = async ({ baseURL, multiThread, direct }) => {
+          const normalizedBase = new URL(baseURL, window.location.href).toString().replace(/\/$/, '')
+
+          if (direct) {
+            return {
+              coreURL: `${normalizedBase}/ffmpeg-core.js`,
+              wasmURL: `${normalizedBase}/ffmpeg-core.wasm`,
+              ...(multiThread ? { workerURL: `${normalizedBase}/ffmpeg-core.worker.js` } : {}),
+            }
+          }
+
+          return {
+            coreURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.wasm`, 'application/wasm'),
+            ...(multiThread
+              ? { workerURL: await toBlobURL(`${normalizedBase}/ffmpeg-core.worker.js`, 'text/javascript') }
+              : {}),
+          }
+        }
         const waitWithTimeout = (promise, label) =>
           Promise.race([
             promise,
@@ -377,17 +401,41 @@ function App() {
         if (!silent) setStatusMessage('Loading FFmpeg.wasm core...')
 
         const loadErrors = []
-        for (const candidate of FFMPEG_MT_CORE_BASE_URLS) {
-          const baseURL = new URL(candidate.baseURL, window.location.href).toString().replace(/\/$/, '')
-          try {
-            if (!silent) setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
-            const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript')
-            const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
-            const workerURL = await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript')
+        const canUseMultiThread = typeof window !== 'undefined' && window.crossOriginIsolated === true
+        if (canUseMultiThread) {
+          for (const candidate of FFMPEG_MT_CORE_BASE_URLS) {
+            try {
+              if (!silent) setStatusMessage(`Loading FFmpeg core (${candidate.id})...`)
+              const config = await buildCoreConfig({
+                baseURL: candidate.baseURL,
+                multiThread: true,
+                direct: candidate.id === 'local',
+              })
+              await waitWithTimeout(ffmpeg.load(config), `FFmpeg core (${candidate.id})`)
+              setIsEngineReady(true)
+              if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
+              return
+            } catch (error) {
+              const reason = toErrorMessage(error, 'Unknown load error')
+              loadErrors.push(`${candidate.id}: ${reason}`)
+              ffmpeg.terminate()
+            }
+          }
+        } else {
+          loadErrors.push('multi-thread engine unavailable: crossOriginIsolated is false')
+        }
 
-            await waitWithTimeout(ffmpeg.load({ coreURL, wasmURL, workerURL }), `FFmpeg core (${candidate.id})`)
+        for (const candidate of FFMPEG_ST_CORE_BASE_URLS) {
+          try {
+            if (!silent) setStatusMessage(`Loading compatibility core (${candidate.id})...`)
+            const config = await buildCoreConfig({
+              baseURL: candidate.baseURL,
+              multiThread: false,
+              direct: candidate.id === 'local-compat',
+            })
+            await waitWithTimeout(ffmpeg.load(config), `Compatibility core (${candidate.id})`)
             setIsEngineReady(true)
-            if (!silent) setStatusMessage('FFmpeg.wasm loaded successfully.')
+            if (!silent) setStatusMessage('FFmpeg.wasm loaded in compatibility mode.')
             return
           } catch (error) {
             const reason = toErrorMessage(error, 'Unknown load error')

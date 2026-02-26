@@ -34,12 +34,22 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Normalize FTP host
+        id: ftp_host
+        shell: bash
+        run: |
+          raw='${{ secrets.HOSTINGER_FTP_HOST }}'
+          cleaned="${raw#ftp://}"
+          cleaned="${cleaned#ftps://}"
+          cleaned="${cleaned%/}"
+          echo "value=$cleaned" >> "$GITHUB_OUTPUT"
+
       - name: Deploy dist to Hostinger via FTPS
         id: deploy_ftps
         continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.HOSTINGER_FTP_HOST }}
+          server: ${{ steps.ftp_host.outputs.value }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           protocol: ftps
@@ -51,7 +61,7 @@ jobs:
         if: steps.deploy_ftps.outcome == 'failure'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.HOSTINGER_FTP_HOST }}
+          server: ${{ steps.ftp_host.outputs.value }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           protocol: ftp
