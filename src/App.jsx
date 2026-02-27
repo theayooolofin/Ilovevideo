@@ -545,30 +545,16 @@ function App() {
 
   const handleDownload = async () => {
     if (!result) return
-    const url = result.url
-
-    // Blob URLs (images) — trigger via <a> directly, same-origin, instant
-    if (url.startsWith('blob:')) {
+    try {
       const a = document.createElement('a')
-      a.href = url
+      a.href = result.url
       a.download = result.fileName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      return
+    } catch {
+      setErrorMessage('Download failed. Please try again.')
     }
-
-    // Remote video URL — fetch full blob before saving to avoid partial downloads
-    const response = await fetch(url)
-    const blob = await response.blob()
-    const blobUrl = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = result.fileName || 'compressed-video.mp4'
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(blobUrl)
-    document.body.removeChild(a)
   }
 
   const goToCompressTool = () => {
@@ -829,6 +815,13 @@ function App() {
                   </button>
                   <p className="status-line">{statusMessage}</p>
 
+                  {/* Keep screen on banner */}
+                  {isProcessing && selectedFile && isVideoFile(selectedFile) && (
+                    <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                      ⚠️ Keep this page open and your screen on during compression
+                    </div>
+                  )}
+
                   {/* Output Card */}
                   {result && (
                     <div className="output-card success">
@@ -1001,6 +994,13 @@ function App() {
                     {resizeButtonState.text}
                   </button>
                   <p className="status-line">{statusMessage}</p>
+
+                  {/* Keep screen on banner */}
+                  {isProcessing && selectedFile && isVideoFile(selectedFile) && (
+                    <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                      ⚠️ Keep this page open and your screen on during compression
+                    </div>
+                  )}
 
                   {/* Output Card */}
                   {result && (
