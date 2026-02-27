@@ -35,8 +35,7 @@ jobs:
       - name: Build app
         run: npm run build
         env:
-          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
-          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Normalize FTP host
         id: ftp_host

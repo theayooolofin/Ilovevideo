@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
-const LARGE_FILE_THRESHOLD_BYTES = 100 * 1024 * 1024
+const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
+
+const LARGE_FILE_THRESHOLD_BYTES = 500 * 1024 * 1024
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -24,19 +26,16 @@ const COMPRESSION_PRESETS = [
     id: 'whatsapp',
     label: 'WhatsApp',
     details: 'Small files for quick sharing.',
-    cloudinary: { quality: 'auto:low', width: 720 },
   },
   {
     id: 'instagram-reel',
     label: 'Instagram Reel',
     details: 'Balanced quality and size.',
-    cloudinary: { quality: 'auto:good', width: 1080 },
   },
   {
     id: 'tiktok',
     label: 'TikTok',
     details: 'Higher quality while reducing size.',
-    cloudinary: { quality: 'auto:good', width: 1080 },
   },
 ]
 
@@ -146,65 +145,6 @@ const loadImage = (sourceUrl) =>
     image.onload = () => resolve(image)
     image.onerror = () => reject(new Error('Unable to decode image file.'))
     image.src = sourceUrl
-  })
-
-// Inject fl_attachment into a Cloudinary URL so it forces a file download
-const toDownloadUrl = (url) => {
-  if (!url || url.startsWith('blob:')) return url
-  return url.replace('/upload/', '/upload/fl_attachment/')
-}
-
-// Upload a video file directly to Cloudinary from the browser using an unsigned preset.
-// onProgress(0–100) tracks upload progress.
-const uploadToCloudinary = (file, onProgress) =>
-  new Promise((resolve, reject) => {
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
-
-    if (!cloudName || !uploadPreset) {
-      reject(new Error('Service is not configured. Please contact support.'))
-      return
-    }
-
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('upload_preset', uploadPreset)
-
-    const xhr = new XMLHttpRequest()
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100))
-      }
-    })
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText)
-          if (data.error) {
-            reject(new Error('Processing failed. Please try again.'))
-          } else {
-            resolve(data)
-          }
-        } catch {
-          reject(new Error('Processing failed. Please try again.'))
-        }
-      } else {
-        try {
-          const err = JSON.parse(xhr.responseText)
-          reject(new Error(err.error?.message || `Upload failed (${xhr.status})`))
-        } catch {
-          reject(new Error(`Upload failed (${xhr.status})`))
-        }
-      }
-    })
-
-    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')))
-    xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')))
-
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`)
-    xhr.send(formData)
   })
 
 function App() {
@@ -418,7 +358,7 @@ function App() {
       return
     }
 
-    // ── Video compression (Cloudinary server-side) ────────────────────────
+    // ── Video compression (Native FFmpeg backend) ────────────────────────
     if (!selectedFile || !isVideoFile(selectedFile)) {
       setErrorMessage('Please select a video file first.')
       return
@@ -426,24 +366,41 @@ function App() {
 
     setErrorMessage('')
     clearResult()
-    setProgress(0)
+    setProgress(5)
     setIsProcessing(true)
 
+    let progressInterval = null
     try {
       setStatusMessage(`Compressing video (${compressionPreset.label})...`)
-      const { quality, width } = compressionPreset.cloudinary
+      progressInterval = setInterval(() => {
+        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
+      }, 1500)
 
-      const data = await uploadToCloudinary(selectedFile, setProgress)
-      setStatusMessage('Processing complete.')
+      const presetMap = { 'instagram-reel': 'instagram' }
+      const apiPreset = presetMap[compressionPreset.id] ?? compressionPreset.id
 
-      const transform = `w_${width},c_scale,q_${quality},vc_auto,f_mp4`
-      const downloadUrl = data.secure_url.replace('/upload/', `/upload/${transform},fl_attachment/`)
+      const formData = new FormData()
+      formData.append('video', selectedFile)
+      formData.append('preset', apiPreset)
+
+      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Server error: ${response.status}`)
+      }
+
+      setProgress(95)
+      const originalSize = parseInt(response.headers.get('X-Original-Size') || '0')
+      const compressedSize = parseInt(response.headers.get('X-Compressed-Size') || '0') || null
+      const savings = response.headers.get('X-Savings-Percent') || '0'
+      const blob = await response.blob()
+      const downloadUrl = URL.createObjectURL(blob)
 
       setResult({
         url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.mp4`,
-        sizeBytes: null,
-        summary: `Preset: ${compressionPreset.label}`,
+        sizeBytes: compressedSize,
+        summary: `Preset: ${compressionPreset.label}${savings !== '0' ? ` · ${savings}% smaller` : ''}`,
       })
       setProgress(100)
       setStatusMessage('Compression complete. Download is ready.')
@@ -452,6 +409,7 @@ function App() {
       setStatusMessage('Compression failed.')
       setProgress(0)
     } finally {
+      if (progressInterval) clearInterval(progressInterval)
       setIsProcessing(false)
     }
   }
@@ -464,24 +422,37 @@ function App() {
 
     setErrorMessage('')
     clearResult()
-    setProgress(0)
+    setProgress(5)
     setIsProcessing(true)
 
+    let progressInterval = null
     try {
       setStatusMessage(`Resizing video for ${resizePreset.label}...`)
+      progressInterval = setInterval(() => {
+        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
+      }, 1500)
 
-      const data = await uploadToCloudinary(selectedFile, setProgress)
-      setStatusMessage('Processing complete.')
+      const formData = new FormData()
+      formData.append('video', selectedFile)
+      formData.append('width', String(resizePreset.width))
+      formData.append('height', String(resizePreset.height))
+      formData.append('mode', resizeFrameMode)
+      formData.append('quality', resizeQuality.id)
 
-      const cropMode = resizeFrameMode === 'crop' ? 'fill' : 'pad'
-      const bgParam = resizeFrameMode === 'crop' ? '' : ',b_black'
-      const transform = `w_${resizePreset.width},h_${resizePreset.height},c_${cropMode}${bgParam},g_center,q_${resizeQuality.cloudinaryQuality},vc_auto,f_mp4`
-      const downloadUrl = data.secure_url.replace('/upload/', `/upload/${transform},fl_attachment/`)
+      const response = await fetch(`${API_URL}/api/resize`, { method: 'POST', body: formData })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Server error: ${response.status}`)
+      }
+
+      setProgress(95)
+      const blob = await response.blob()
+      const downloadUrl = URL.createObjectURL(blob)
 
       setResult({
         url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${resizePreset.id}-${resizeFrameMode}-${resizePreset.width}x${resizePreset.height}.mp4`,
-        sizeBytes: null,
+        sizeBytes: blob.size,
         summary: `${resizePreset.width}×${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
       })
       setProgress(100)
@@ -491,6 +462,7 @@ function App() {
       setStatusMessage('Video resize failed.')
       setProgress(0)
     } finally {
+      if (progressInterval) clearInterval(progressInterval)
       setIsProcessing(false)
     }
   }
@@ -572,7 +544,7 @@ function App() {
   }
 
   const handleDownload = () => {
-    if (!result || isDownloading) return
+    if (!result) return
     const url = result.url
 
     // Blob URLs (images) — trigger via <a> directly, same-origin, instant
