@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-const LARGE_FILE_THRESHOLD_BYTES = 200 * 1024 * 1024
+const LARGE_FILE_THRESHOLD_BYTES = 100 * 1024 * 1024
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -218,7 +218,6 @@ function App() {
   const [resizeFrameMode, setResizeFrameMode] = useState(RESIZE_FRAME_MODES[0].id)
   const [imageOutputId, setImageOutputId] = useState(IMAGE_OUTPUT_FORMATS[0].id)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
@@ -572,10 +571,11 @@ function App() {
     await handleResizeImage()
   }
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (!result || isDownloading) return
     const url = result.url
-    // Blob URLs are same-origin — download directly
+
+    // Blob URLs (images) — trigger via <a> directly, same-origin, instant
     if (url.startsWith('blob:')) {
       const a = document.createElement('a')
       a.href = url
@@ -585,27 +585,18 @@ function App() {
       document.body.removeChild(a)
       return
     }
-    // Remote URL — fetch as blob so the browser shows a native download
-    // dialog without navigating to the external domain
-    setIsDownloading(true)
-    try {
-      const resp = await fetch(url)
-      if (!resp.ok) throw new Error()
-      const blob = await resp.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = result.fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
-    } catch {
-      // Fallback: open in new tab
-      window.open(url, '_blank')
-    } finally {
-      setIsDownloading(false)
-    }
+
+    // Remote video URL — use hidden iframe so the server's
+    // Content-Disposition: attachment header triggers a native download
+    // dialog without navigating the page or loading the file into RAM.
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    iframe.src = url
+    document.body.appendChild(iframe)
+    // Remove the iframe after enough time for the download to start
+    setTimeout(() => {
+      if (document.body.contains(iframe)) document.body.removeChild(iframe)
+    }, 60000)
   }
 
   const goToCompressTool = () => {
@@ -808,7 +799,7 @@ function App() {
                     </label>
                     {showLargeFileWarning && (
                       <div className="large-file-warning">
-                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 200 MB may be rejected. For best results, use a file under 200 MB.
+                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 100 MB may fail to upload. For best results, use a file under 100 MB.
                       </div>
                     )}
                     {isProcessing && (
@@ -879,11 +870,9 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <button type="button" onClick={handleDownload} disabled={isDownloading} className="download-btn">
-                          {isDownloading
-                            ? <><span className="action-spinner" style={{ width: '1em', height: '1em', borderWidth: 2 }} /> Downloading...</>
-                            : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg> Download File</>
-                          }
+                        <button type="button" onClick={handleDownload} className="download-btn">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          Download File
                         </button>
                       </div>
                     </div>
@@ -991,7 +980,7 @@ function App() {
                     </label>
                     {showLargeFileWarning && (
                       <div className="large-file-warning">
-                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 200 MB may be rejected. For best results, use a file under 200 MB.
+                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 100 MB may fail to upload. For best results, use a file under 100 MB.
                       </div>
                     )}
                     {isProcessing && (
@@ -1054,11 +1043,9 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <button type="button" onClick={handleDownload} disabled={isDownloading} className="download-btn">
-                          {isDownloading
-                            ? <><span className="action-spinner" style={{ width: '1em', height: '1em', borderWidth: 2 }} /> Downloading...</>
-                            : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg> Download File</>
-                          }
+                        <button type="button" onClick={handleDownload} className="download-btn">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          Download File
                         </button>
                       </div>
                     </div>
