@@ -543,7 +543,7 @@ function App() {
     await handleResizeImage()
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!result) return
     const url = result.url
 
@@ -558,17 +558,17 @@ function App() {
       return
     }
 
-    // Remote video URL — use hidden iframe so the server's
-    // Content-Disposition: attachment header triggers a native download
-    // dialog without navigating the page or loading the file into RAM.
-    const iframe = document.createElement('iframe')
-    iframe.style.display = 'none'
-    iframe.src = url
-    document.body.appendChild(iframe)
-    // Remove the iframe after enough time for the download to start
-    setTimeout(() => {
-      if (document.body.contains(iframe)) document.body.removeChild(iframe)
-    }, 60000)
+    // Remote video URL — fetch full blob before saving to avoid partial downloads
+    const response = await fetch(url)
+    const blob = await response.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = result.fileName || 'compressed-video.mp4'
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(blobUrl)
+    document.body.removeChild(a)
   }
 
   const goToCompressTool = () => {
