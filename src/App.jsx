@@ -383,7 +383,7 @@ function App() {
       formData.append('video', selectedFile)
       formData.append('preset', apiPreset)
 
-      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData })
+      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors' })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || `Server error: ${response.status}`)
@@ -439,7 +439,7 @@ function App() {
       formData.append('mode', resizeFrameMode)
       formData.append('quality', resizeQuality.id)
 
-      const response = await fetch(`${API_URL}/api/resize`, { method: 'POST', body: formData })
+      const response = await fetch(`${API_URL}/api/resize`, { method: 'POST', body: formData, mode: 'cors' })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || `Server error: ${response.status}`)
