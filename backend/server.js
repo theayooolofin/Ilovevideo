@@ -15,7 +15,8 @@ app.use(cors({
     'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-User-ID'],
+  allowedHeaders: ['Content-Type', 'X-User-ID', 'Authorization'],
+  credentials: true,
 }));
 
 app.set('trust proxy', 1); // Nginx forwards real IP via X-Forwarded-For
