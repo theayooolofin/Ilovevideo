@@ -319,16 +319,21 @@ function App() {
       const res = await fetch(`${API_URL}/api/create-payment`, { method: 'POST', headers })
       if (!res.ok) throw new Error('Payment setup failed')
       const config = await res.json()
-      window.FlutterwaveCheckout({
-        ...config,
-        callback: (data) => {
-          if (data.status === 'successful') {
+      const handler = window.PaystackPop.setup({
+        key: config.public_key,
+        email: config.email,
+        amount: config.amount,
+        currency: config.currency,
+        ref: config.reference,
+        callback: (response) => {
+          if (response.reference) {
             setShowLimitModal(false)
             fetchUsage()
           }
         },
-        onclose: () => {},
+        onClose: () => {},
       })
+      handler.openIframe()
     } catch {
       setErrorMessage('Payment setup failed. Please try again.')
     }

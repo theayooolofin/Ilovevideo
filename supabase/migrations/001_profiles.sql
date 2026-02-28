@@ -8,7 +8,7 @@ create table if not exists public.profiles (
   id                  uuid references auth.users(id) on delete cascade primary key,
   is_pro              boolean      not null default false,
   pro_since           timestamptz,
-  flutterwave_tx_ref  text,
+  paystack_ref        text,
   created_at          timestamptz  not null default now()
 );
 

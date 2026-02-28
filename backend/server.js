@@ -24,7 +24,7 @@ app.use(cors({
 app.set('trust proxy', 1);
 
 // Raw body for webhook signature verification; JSON for everything else
-app.use('/api/flutterwave-webhook', express.raw({ type: 'application/json' }));
+app.use('/api/paystack-webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // ── Supabase admin client ────────────────────────────────────────────────────
@@ -343,31 +343,26 @@ app.post('/api/create-payment', async (req, res) => {
   const user = await resolveUser(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-  const txRef = `ilv-${user.id}-${Date.now()}`;
+  const reference = `ilv-${user.id}-${Date.now()}`;
 
   res.json({
-    public_key: process.env.FLW_PUBLIC_KEY,
-    tx_ref: txRef,
-    amount: 4.99,
+    public_key: process.env.PAYSTACK_PUBLIC_KEY,
+    email: user.email,
+    amount: 499,        // Paystack expects cents: $4.99 = 499
     currency: 'USD',
-    payment_options: 'card',
-    customer: {
-      email: user.email,
-      name: user.email,
-    },
-    customizations: {
-      title: 'iLoveVideo Pro',
-      description: 'Unlimited video compressions — $4.99/month',
-      logo: 'https://ilovevideo.fun/favicon.ico',
-    },
+    reference,
   });
 });
 
-app.post('/api/flutterwave-webhook', async (req, res) => {
-  // Verify Flutterwave signature
-  const secretHash = process.env.FLW_SECRET_HASH;
-  const signature = req.headers['verif-hash'];
-  if (!secretHash || !signature || signature !== secretHash) {
+app.post('/api/paystack-webhook', async (req, res) => {
+  // Verify Paystack HMAC SHA512 signature
+  const signature = req.headers['x-paystack-signature'];
+  const expectedHash = crypto
+    .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+    .update(req.body)
+    .digest('hex');
+
+  if (!signature || signature !== expectedHash) {
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
@@ -378,14 +373,11 @@ app.post('/api/flutterwave-webhook', async (req, res) => {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const { event, data } = payload;
-
-  if (event === 'charge.completed' && data?.status === 'successful') {
-    const txRef = data.tx_ref || '';
-    // txRef format: ilv-<uuid>-<timestamp>
-    // UUID is 8-4-4-4-12 hex segments = 5 dash-separated parts
-    const parts = txRef.split('-');
-    // parts: ['ilv', uuid-part1, uuid-part2, uuid-part3, uuid-part4, uuid-part5, timestamp]
+  if (payload.event === 'charge.success') {
+    const reference = payload.data?.reference || '';
+    // reference format: ilv-<uuid>-<timestamp>
+    // UUID segments: 8-4-4-4-12 = 5 dash-separated parts
+    const parts = reference.split('-');
     if (parts.length >= 7 && parts[0] === 'ilv') {
       const userId = parts.slice(1, 6).join('-');
       try {
@@ -394,7 +386,7 @@ app.post('/api/flutterwave-webhook', async (req, res) => {
           .update({
             is_pro: true,
             pro_since: new Date().toISOString(),
-            flutterwave_tx_ref: txRef,
+            paystack_ref: reference,
           })
           .eq('id', userId);
         console.log(`✅ Pro activated for user ${userId}`);
@@ -419,5 +411,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ iLoveVideo API running on port ${PORT}`);
   console.log(`🎬 Engine: Native FFmpeg`);
-  console.log(`💳 Pro tier: ${process.env.FLW_PUBLIC_KEY ? 'Flutterwave configured' : 'FLW keys missing'}`);
+  console.log(`💳 Pro tier: ${process.env.PAYSTACK_PUBLIC_KEY ? 'Paystack configured' : 'PAYSTACK keys missing'}`);
 });
