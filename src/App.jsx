@@ -183,6 +183,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isPro, setIsPro] = useState(false)
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -238,14 +239,21 @@ function App() {
     [result],
   )
 
-  const fetchUsage = async (userId = null) => {
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) return { 'Authorization': `Bearer ${session.access_token}` }
+    return {}
+  }
+
+  const fetchUsage = async () => {
     try {
-      const headers = userId ? { 'X-User-ID': userId } : {}
+      const headers = await getAuthHeaders()
       const res = await fetch(`${API_URL}/api/my-usage`, { headers })
       if (res.ok) {
         const data = await res.json()
         setUsageCount(data.count)
-        setUsageLimit(data.limit)
+        setUsageLimit(data.limit ?? FREE_LIMIT)
+        setIsPro(data.is_pro ?? false)
       }
     } catch {}
   }
@@ -255,7 +263,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
-      fetchUsage(currentUser?.id ?? null)
+      fetchUsage()
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -295,6 +303,35 @@ function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
+  }
+
+  const handleGoPro = async () => {
+    if (!user) {
+      setShowLimitModal(false)
+      setAuthMode('signup')
+      setAuthError('')
+      setShowAuthModal(true)
+      return
+    }
+    try {
+      const headers = await getAuthHeaders()
+      headers['Content-Type'] = 'application/json'
+      const res = await fetch(`${API_URL}/api/create-payment`, { method: 'POST', headers })
+      if (!res.ok) throw new Error('Payment setup failed')
+      const config = await res.json()
+      window.FlutterwaveCheckout({
+        ...config,
+        callback: (data) => {
+          if (data.status === 'successful') {
+            setShowLimitModal(false)
+            fetchUsage()
+          }
+        },
+        onclose: () => {},
+      })
+    } catch {
+      setErrorMessage('Payment setup failed. Please try again.')
+    }
   }
 
   useEffect(() => {
@@ -467,8 +504,7 @@ function App() {
       formData.append('video', selectedFile)
       formData.append('preset', apiPreset)
 
-      const compressHeaders = {}
-      if (user?.id) compressHeaders['X-User-ID'] = user.id
+      const compressHeaders = await getAuthHeaders()
       const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors', headers: compressHeaders })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -490,7 +526,7 @@ function App() {
       })
       setProgress(100)
       setStatusMessage('Compression complete. Download is ready.')
-      fetchUsage(user?.id ?? null)
+      fetchUsage()
     } catch (error) {
       if (error.message && error.message.includes('LIMIT_REACHED')) { setShowLimitModal(true); return; }
       setErrorMessage(toErrorMessage(error, 'Compression failed.'))
@@ -527,7 +563,8 @@ function App() {
       formData.append('mode', resizeFrameMode)
       formData.append('quality', resizeQuality.id)
 
-      const response = await fetch(`${API_URL}/api/resize`, { method: 'POST', body: formData, mode: 'cors' })
+      const resizeHeaders = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/resize`, { method: 'POST', body: formData, mode: 'cors', headers: resizeHeaders })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || `Server error: ${response.status}`)
@@ -695,14 +732,20 @@ function App() {
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚡</div>
             <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', marginBottom: '12px' }}>Daily Limit Reached</h2>
             <p style={{ fontSize: '15px', color: '#6b7280', lineHeight: '1.6', marginBottom: '28px' }}>
-              You've used your 3 free compressions today.<br />
-              Sign up to get more tomorrow or upgrade to Pro for unlimited.
+              You've used your {usageLimit} {user ? '' : 'free '}compression{usageLimit !== 1 ? 's' : ''} today.<br />
+              {user ? 'Go Pro for unlimited compressions.' : 'Sign up for 10/day, or go Pro for unlimited.'}
             </p>
             <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
-              <button onClick={() => { setShowLimitModal(false); setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }}
-                style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
-                Sign Up Free → 10/day
+              <button onClick={handleGoPro}
+                style={{ padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>
+                Go Pro — Unlimited ($4.99/mo)
               </button>
+              {!user && (
+                <button onClick={() => { setShowLimitModal(false); setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }}
+                  style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                  Sign Up Free → 10/day
+                </button>
+              )}
               <button onClick={() => setShowLimitModal(false)}
                 style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '15px', fontWeight: '500', color: '#374151', cursor: 'pointer' }}>
                 Remind Me Tomorrow

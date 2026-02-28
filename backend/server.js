@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const { spawn } = require('child_process');
@@ -5,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
@@ -19,10 +21,20 @@ app.use(cors({
   credentials: true,
 }));
 
-app.set('trust proxy', 1); // Nginx forwards real IP via X-Forwarded-For
+app.set('trust proxy', 1);
 
+// Raw body for webhook signature verification; JSON for everything else
+app.use('/api/flutterwave-webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
+// ── Supabase admin client ────────────────────────────────────────────────────
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
+
+// ── Usage tracking (local file) ──────────────────────────────────────────────
 const USAGE_FILE = path.join(__dirname, 'usage.json');
 const GUEST_LIMIT = 3;
 const USER_LIMIT = 10;
@@ -42,7 +54,6 @@ function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '';
 }
 
-// key is either "user:<uid>" or the raw IP string
 function getUsageForKey(key) {
   const data = loadUsage();
   const today = new Date().toISOString().slice(0, 10);
@@ -60,19 +71,44 @@ function incrementUsageForKey(key) {
   return data[key].count;
 }
 
-function resolveKeyAndLimit(req) {
-  const userId = (req.headers['x-user-id'] || '').trim();
-  if (userId) return { key: `user:${userId}`, limit: USER_LIMIT };
-  return { key: getClientIp(req), limit: GUEST_LIMIT };
+// ── JWT verification + pro check ────────────────────────────────────────────
+async function resolveUser(req) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  if (!token) return null;
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return null;
+    return user;
+  } catch {
+    return null;
+  }
 }
 
+async function resolveKeyAndLimit(req) {
+  const user = await resolveUser(req);
+  if (user) {
+    let isPro = false;
+    try {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('is_pro')
+        .eq('id', user.id)
+        .single();
+      isPro = profile?.is_pro ?? false;
+    } catch {}
+    return { key: `user:${user.id}`, limit: isPro ? null : USER_LIMIT, isPro, userId: user.id };
+  }
+  return { key: getClientIp(req), limit: GUEST_LIMIT, isPro: false, userId: null };
+}
+
+// ── File management ──────────────────────────────────────────────────────────
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const OUTPUT_DIR = path.join(__dirname, 'outputs');
 [UPLOAD_DIR, OUTPUT_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// Auto-delete files older than 1 hour
 setInterval(() => {
   [UPLOAD_DIR, OUTPUT_DIR].forEach(dir => {
     fs.readdir(dir, (err, files) => {
@@ -81,9 +117,7 @@ setInterval(() => {
         const filePath = path.join(dir, file);
         fs.stat(filePath, (err, stats) => {
           if (err) return;
-          if (Date.now() - stats.mtimeMs > 3600000) {
-            fs.unlink(filePath, () => {});
-          }
+          if (Date.now() - stats.mtimeMs > 3600000) fs.unlink(filePath, () => {});
         });
       });
     });
@@ -146,7 +180,7 @@ const RESIZE_CRF = {
   'balanced': '28',
 };
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── FFmpeg helper ────────────────────────────────────────────────────────────
 const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
   const cleanup = (deleteOutput = false) => {
     if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
@@ -231,25 +265,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', engine: 'native FFmpeg', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/my-usage', (req, res) => {
-  const { key, limit } = resolveKeyAndLimit(req);
+app.get('/api/my-usage', async (req, res) => {
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
   const usage = getUsageForKey(key);
-  res.json({ count: usage.count, limit, remaining: Math.max(0, limit - usage.count) });
+  res.json({
+    count: usage.count,
+    limit: isPro ? null : limit,
+    is_pro: isPro,
+    remaining: isPro ? null : Math.max(0, limit - usage.count),
+  });
 });
 
-app.get('/api/usage/:key', (req, res) => {
-  const usage = getUsageForKey(req.params.key);
-  const limit = req.params.key.startsWith('user:') ? USER_LIMIT : GUEST_LIMIT;
-  res.json({ count: usage.count, limit, remaining: Math.max(0, limit - usage.count) });
-});
-
-
-app.post('/api/compress', upload.single('video'), (req, res) => {
+app.post('/api/compress', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
 
-  const { key, limit } = resolveKeyAndLimit(req);
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
   const usage = getUsageForKey(key);
-  if (usage.count >= limit) {
+
+  if (!isPro && usage.count >= limit) {
     fs.unlink(req.file.path, () => {});
     return res.status(429).json({ error: 'LIMIT_REACHED', limit });
   }
@@ -266,8 +299,17 @@ app.post('/api/compress', upload.single('video'), (req, res) => {
   runFFmpeg(['-i', inputPath, ...presetArgs, outputPath], inputPath, outputPath, res, req);
 });
 
-app.post('/api/resize', upload.single('video'), (req, res) => {
+app.post('/api/resize', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
+  const usage = getUsageForKey(key);
+
+  if (!isPro && usage.count >= limit) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(429).json({ error: 'LIMIT_REACHED', limit });
+  }
+  incrementUsageForKey(key);
 
   const { width = '1080', height = '1920', mode = 'fit', quality = 'high' } = req.body;
   const w = parseInt(width);
@@ -296,6 +338,75 @@ app.post('/api/resize', upload.single('video'), (req, res) => {
   runFFmpeg(args, inputPath, outputPath, res, req, { sizeGuard: true });
 });
 
+// ── Payment routes ───────────────────────────────────────────────────────────
+app.post('/api/create-payment', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const txRef = `ilv-${user.id}-${Date.now()}`;
+
+  res.json({
+    public_key: process.env.FLW_PUBLIC_KEY,
+    tx_ref: txRef,
+    amount: 4.99,
+    currency: 'USD',
+    payment_options: 'card',
+    customer: {
+      email: user.email,
+      name: user.email,
+    },
+    customizations: {
+      title: 'iLoveVideo Pro',
+      description: 'Unlimited video compressions — $4.99/month',
+      logo: 'https://ilovevideo.fun/favicon.ico',
+    },
+  });
+});
+
+app.post('/api/flutterwave-webhook', async (req, res) => {
+  // Verify Flutterwave signature
+  const secretHash = process.env.FLW_SECRET_HASH;
+  const signature = req.headers['verif-hash'];
+  if (!secretHash || !signature || signature !== secretHash) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body.toString());
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const { event, data } = payload;
+
+  if (event === 'charge.completed' && data?.status === 'successful') {
+    const txRef = data.tx_ref || '';
+    // txRef format: ilv-<uuid>-<timestamp>
+    // UUID is 8-4-4-4-12 hex segments = 5 dash-separated parts
+    const parts = txRef.split('-');
+    // parts: ['ilv', uuid-part1, uuid-part2, uuid-part3, uuid-part4, uuid-part5, timestamp]
+    if (parts.length >= 7 && parts[0] === 'ilv') {
+      const userId = parts.slice(1, 6).join('-');
+      try {
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            is_pro: true,
+            pro_since: new Date().toISOString(),
+            flutterwave_tx_ref: txRef,
+          })
+          .eq('id', userId);
+        console.log(`✅ Pro activated for user ${userId}`);
+      } catch (err) {
+        console.error('Failed to activate pro:', err.message);
+      }
+    }
+  }
+
+  res.status(200).json({ status: 'ok' });
+});
+
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
@@ -308,4 +419,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ iLoveVideo API running on port ${PORT}`);
   console.log(`🎬 Engine: Native FFmpeg`);
+  console.log(`💳 Pro tier: ${process.env.FLW_PUBLIC_KEY ? 'Flutterwave configured' : 'FLW keys missing'}`);
 });
