@@ -269,10 +269,17 @@ function App() {
     e.preventDefault()
     setAuthError('')
     setAuthLoading(true)
-    const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+    const { data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
     setAuthLoading(false)
     if (error) { setAuthError(error.message); return }
-    setAuthError('Check your email to confirm your account.')
+    if (data.session) {
+      setUser(data.session.user)
+      setShowAuthModal(false)
+      setAuthEmail('')
+      setAuthPassword('')
+    } else {
+      setAuthError('Check your email to confirm your account.')
+    }
   }
 
   const handleGoogleAuth = async () => {
