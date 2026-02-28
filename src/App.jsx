@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { supabase } from './supabase'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
 
 const LARGE_FILE_THRESHOLD_BYTES = 500 * 1024 * 1024
 const FREE_LIMIT = 3
+const USER_LIMIT = 10
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -165,7 +167,15 @@ function App() {
   const [result, setResult] = useState(null)
   const [isDropActive, setIsDropActive] = useState(false)
   const [usageCount, setUsageCount] = useState(0)
+  const [usageLimit, setUsageLimit] = useState(FREE_LIMIT)
   const [showLimitModal, setShowLimitModal] = useState(false)
+  const [user, setUser] = useState(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authMode, setAuthMode] = useState('login')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -221,17 +231,57 @@ function App() {
     [result],
   )
 
-  const fetchUsage = async () => {
+  const fetchUsage = async (userId = null) => {
     try {
-      const res = await fetch(`${API_URL}/api/my-usage`)
+      const headers = userId ? { 'X-User-ID': userId } : {}
+      const res = await fetch(`${API_URL}/api/my-usage`, { headers })
       if (res.ok) {
         const data = await res.json()
         setUsageCount(data.count)
+        setUsageLimit(data.limit)
       }
     } catch {}
   }
 
-  useEffect(() => { fetchUsage() }, [])
+  useEffect(() => {
+    // Subscribe to auth state — fires immediately with current session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      fetchUsage(currentUser?.id ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignIn = async (e) => {
+    e.preventDefault()
+    setAuthError('')
+    setAuthLoading(true)
+    const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+    setAuthLoading(false)
+    if (error) { setAuthError(error.message); return }
+    setShowAuthModal(false)
+    setAuthEmail('')
+    setAuthPassword('')
+  }
+
+  const handleSignUp = async (e) => {
+    e.preventDefault()
+    setAuthError('')
+    setAuthLoading(true)
+    const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+    setAuthLoading(false)
+    if (error) { setAuthError(error.message); return }
+    setAuthError('Check your email to confirm your account.')
+  }
+
+  const handleGoogleAuth = async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
 
   useEffect(() => {
     setSelectedFile(null)
@@ -379,7 +429,7 @@ function App() {
       return
     }
 
-    if (usageCount >= FREE_LIMIT) { setShowLimitModal(true); return }
+    if (usageCount >= usageLimit) { setShowLimitModal(true); return }
 
     setErrorMessage('')
     clearResult()
@@ -400,7 +450,9 @@ function App() {
       formData.append('video', selectedFile)
       formData.append('preset', apiPreset)
 
-      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors' })
+      const compressHeaders = {}
+      if (user?.id) compressHeaders['X-User-ID'] = user.id
+      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors', headers: compressHeaders })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.error || `Server error: ${response.status}`)
@@ -421,7 +473,7 @@ function App() {
       })
       setProgress(100)
       setStatusMessage('Compression complete. Download is ready.')
-      fetchUsage()
+      fetchUsage(user?.id ?? null)
     } catch (error) {
       if (error.message && error.message.includes('LIMIT_REACHED')) { setShowLimitModal(true); return; }
       setErrorMessage(toErrorMessage(error, 'Compression failed.'))
@@ -627,15 +679,75 @@ function App() {
               Sign up to get more tomorrow or upgrade to Pro for unlimited.
             </p>
             <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+              <button onClick={() => { setShowLimitModal(false); setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }}
+                style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                Sign Up Free → 10/day
+              </button>
               <button onClick={() => setShowLimitModal(false)}
                 style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '15px', fontWeight: '500', color: '#374151', cursor: 'pointer' }}>
                 Remind Me Tomorrow
               </button>
-              <button onClick={() => setShowLimitModal(false)}
-                style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
-                Go Pro → Unlimited
-              </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAuthModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAuthModal(false) }}
+        >
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '36px 32px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '0', marginBottom: '28px', borderBottom: '2px solid #f3f4f6' }}>
+              {['login', 'signup'].map((mode) => (
+                <button key={mode} type="button"
+                  onClick={() => { setAuthMode(mode); setAuthError('') }}
+                  style={{ flex: 1, padding: '10px', background: 'none', border: 'none', fontSize: '15px', fontWeight: '600', cursor: 'pointer', color: authMode === mode ? '#2563eb' : '#9ca3af', borderBottom: authMode === mode ? '2px solid #2563eb' : '2px solid transparent', marginBottom: '-2px' }}>
+                  {mode === 'login' ? 'Sign In' : 'Sign Up'}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={authMode === 'login' ? handleSignIn : handleSignUp}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <input
+                  type="email" placeholder="Email address" required autoComplete="email"
+                  value={authEmail} onChange={(e) => setAuthEmail(e.target.value)}
+                  style={{ padding: '11px 14px', borderRadius: '8px', border: '1.5px solid #e5e7eb', fontSize: '15px', outline: 'none' }}
+                />
+                <input
+                  type="password" placeholder="Password" required autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                  value={authPassword} onChange={(e) => setAuthPassword(e.target.value)}
+                  style={{ padding: '11px 14px', borderRadius: '8px', border: '1.5px solid #e5e7eb', fontSize: '15px', outline: 'none' }}
+                />
+                {authError && (
+                  <p style={{ fontSize: '13px', color: authError.startsWith('Check') ? '#059669' : '#dc2626', margin: 0 }}>{authError}</p>
+                )}
+                <button type="submit" disabled={authLoading}
+                  style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: authLoading ? 'not-allowed' : 'pointer', opacity: authLoading ? 0.7 : 1 }}>
+                  {authLoading ? 'Please wait...' : authMode === 'login' ? 'Sign In' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' }}>
+              <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+              <span style={{ fontSize: '13px', color: '#9ca3af' }}>or</span>
+              <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }} />
+            </div>
+
+            <button type="button" onClick={handleGoogleAuth}
+              style={{ width: '100%', padding: '11px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '15px', fontWeight: '500', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              Continue with Google
+            </button>
+
+            {authMode === 'signup' && (
+              <p style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', marginTop: '16px', lineHeight: '1.5' }}>
+                Free accounts get 10 compressions/day.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -654,9 +766,18 @@ function App() {
           <div className="nav-spacer" />
           <a href="#how-it-works" className="nav-link">How it works</a>
           <div className="nav-divider" />
-          <button type="button" className="nav-cta" onClick={goToCompressTool}>
-            Try it Free →
-          </button>
+          {user ? (
+            <>
+              <span style={{ fontSize: '13px', color: '#6b7280', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+              <button type="button" className="nav-link" style={{ marginLeft: '12px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={handleSignOut}>Sign Out</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="nav-link" style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={() => { setAuthMode('login'); setAuthError(''); setShowAuthModal(true) }}>Sign In</button>
+              <div className="nav-divider" />
+              <button type="button" className="nav-cta" onClick={goToCompressTool}>Try it Free →</button>
+            </>
+          )}
         </div>
       </nav>
 
@@ -859,7 +980,7 @@ function App() {
 
                   {isCompressTool && compressMediaType === 'video' && usageCount > 0 && !isProcessing && (
                     <p style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
-                      {usageCount} of {FREE_LIMIT} free compressions used today
+                      {usageCount} of {usageLimit} free compressions used today
                     </p>
                   )}
 

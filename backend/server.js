@@ -15,7 +15,7 @@ app.use(cors({
     'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'X-User-ID'],
 }));
 
 app.set('trust proxy', 1); // Nginx forwards real IP via X-Forwarded-For
@@ -23,7 +23,8 @@ app.set('trust proxy', 1); // Nginx forwards real IP via X-Forwarded-For
 app.use(express.json());
 
 const USAGE_FILE = path.join(__dirname, 'usage.json');
-const FREE_LIMIT = 3;
+const GUEST_LIMIT = 3;
+const USER_LIMIT = 10;
 
 function loadUsage() {
   try {
@@ -40,21 +41,28 @@ function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '';
 }
 
-function getUsageForIp(ip) {
+// key is either "user:<uid>" or the raw IP string
+function getUsageForKey(key) {
   const data = loadUsage();
   const today = new Date().toISOString().slice(0, 10);
-  const entry = data[ip];
+  const entry = data[key];
   if (!entry || entry.date !== today) return { count: 0, date: today };
   return entry;
 }
 
-function incrementUsage(ip) {
+function incrementUsageForKey(key) {
   const data = loadUsage();
   const today = new Date().toISOString().slice(0, 10);
-  if (!data[ip] || data[ip].date !== today) data[ip] = { count: 0, date: today };
-  data[ip].count += 1;
+  if (!data[key] || data[key].date !== today) data[key] = { count: 0, date: today };
+  data[key].count += 1;
   saveUsage(data);
-  return data[ip].count;
+  return data[key].count;
+}
+
+function resolveKeyAndLimit(req) {
+  const userId = (req.headers['x-user-id'] || '').trim();
+  if (userId) return { key: `user:${userId}`, limit: USER_LIMIT };
+  return { key: getClientIp(req), limit: GUEST_LIMIT };
 }
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -198,27 +206,28 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/my-usage', (req, res) => {
-  const ip = getClientIp(req);
-  const usage = getUsageForIp(ip);
-  res.json({ count: usage.count, limit: FREE_LIMIT, remaining: Math.max(0, FREE_LIMIT - usage.count) });
+  const { key, limit } = resolveKeyAndLimit(req);
+  const usage = getUsageForKey(key);
+  res.json({ count: usage.count, limit, remaining: Math.max(0, limit - usage.count) });
 });
 
-app.get('/api/usage/:ip', (req, res) => {
-  const usage = getUsageForIp(req.params.ip);
-  res.json({ count: usage.count, limit: FREE_LIMIT, remaining: Math.max(0, FREE_LIMIT - usage.count) });
+app.get('/api/usage/:key', (req, res) => {
+  const usage = getUsageForKey(req.params.key);
+  const limit = req.params.key.startsWith('user:') ? USER_LIMIT : GUEST_LIMIT;
+  res.json({ count: usage.count, limit, remaining: Math.max(0, limit - usage.count) });
 });
 
 
 app.post('/api/compress', upload.single('video'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
 
-  const ip = getClientIp(req);
-  const usage = getUsageForIp(ip);
-  if (usage.count >= FREE_LIMIT) {
+  const { key, limit } = resolveKeyAndLimit(req);
+  const usage = getUsageForKey(key);
+  if (usage.count >= limit) {
     fs.unlink(req.file.path, () => {});
-    return res.status(429).json({ error: 'LIMIT_REACHED', limit: FREE_LIMIT });
+    return res.status(429).json({ error: 'LIMIT_REACHED', limit });
   }
-  incrementUsage(ip);
+  incrementUsageForKey(key);
 
   const preset = req.body.preset || 'whatsapp';
   const presetArgs = COMPRESS_PRESETS[preset] || COMPRESS_PRESETS.whatsapp;
