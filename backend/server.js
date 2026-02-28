@@ -112,7 +112,7 @@ const upload = multer({
 // ── Compression presets ──────────────────────────────────────────────────────
 const COMPRESS_PRESETS = {
   whatsapp: [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
     '-vf', 'scale=-2:720',
     '-c:a', 'aac', '-b:a', '96k',
     '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
@@ -139,7 +139,7 @@ const RESIZE_CRF = {
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const runFFmpeg = (args, inputPath, outputPath, res, req) => {
+const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
   const cleanup = (deleteOutput = false) => {
     if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
     if (deleteOutput && fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
@@ -167,6 +167,24 @@ const runFFmpeg = (args, inputPath, outputPath, res, req) => {
 
     const originalSize = fs.statSync(inputPath).size;
     const outputSize = fs.statSync(outputPath).size;
+
+    // Size guard: if output is larger than input, return the original file unchanged
+    if (opts.sizeGuard && outputSize > originalSize) {
+      fs.unlink(outputPath, () => {});
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('X-Original-Size', originalSize.toString());
+      res.setHeader('X-Compressed-Size', originalSize.toString());
+      res.setHeader('X-Savings-Percent', '0');
+      res.setHeader('X-Already-Optimized', 'true');
+      res.setHeader('Access-Control-Expose-Headers',
+        'X-Original-Size, X-Compressed-Size, X-Savings-Percent, X-Already-Optimized');
+      const origStream = fs.createReadStream(inputPath);
+      origStream.pipe(res);
+      origStream.on('end', () => { if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {}); });
+      origStream.on('error', () => { if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {}); });
+      return;
+    }
+
     const savingsPercent = Math.max(0, Math.round(((originalSize - outputSize) / originalSize) * 100));
 
     res.setHeader('Content-Type', 'video/mp4');
@@ -267,7 +285,7 @@ app.post('/api/resize', upload.single('video'), (req, res) => {
     outputPath,
   ];
 
-  runFFmpeg(args, inputPath, outputPath, res, req);
+  runFFmpeg(args, inputPath, outputPath, res, req, { sizeGuard: true });
 });
 
 // ── Error handler ────────────────────────────────────────────────────────────

@@ -404,10 +404,11 @@ function App() {
         ctx.drawImage(image, 0, 0, targetWidth, targetHeight)
 
         const originalMime = selectedFile.type
-        const preserveMimes = ['image/jpeg', 'image/png', 'image/webp']
-        const outputMime = preserveMimes.includes(originalMime) ? originalMime : 'image/jpeg'
-        const quality =
-          outputMime === 'image/jpeg' || outputMime === 'image/webp' ? imagePreset.quality : undefined
+        const isPng = originalMime === 'image/png'
+        // PNG → WebP for real compression; otherwise preserve JPEG/WebP, fallback to JPEG
+        const outputMime = isPng ? 'image/webp'
+          : ['image/jpeg', 'image/webp'].includes(originalMime) ? originalMime : 'image/jpeg'
+        const quality = isPng ? 0.92 : imagePreset.quality
         const blob = await canvasToBlob(canvas, outputMime, quality)
         const ext = outputMime === 'image/jpeg' ? 'jpg' : outputMime === 'image/webp' ? 'webp' : 'png'
 
@@ -415,7 +416,9 @@ function App() {
           url: URL.createObjectURL(blob),
           fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-optimized.${ext}`,
           sizeBytes: blob.size,
-          summary: `Optimized for ${compressionPreset.label} | ${targetWidth}x${targetHeight}`,
+          summary: isPng
+            ? `Converted to WebP for smaller file size | ${targetWidth}x${targetHeight}`
+            : `Optimized for ${compressionPreset.label} | ${targetWidth}x${targetHeight}`,
         })
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(100)
@@ -525,6 +528,7 @@ function App() {
       }
 
       setProgress(95)
+      const alreadyOptimized = response.headers.get('X-Already-Optimized') === 'true'
       const blob = await response.blob()
       const downloadUrl = URL.createObjectURL(blob)
 
@@ -532,10 +536,12 @@ function App() {
         url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${resizePreset.id}-${resizeFrameMode}-${resizePreset.width}x${resizePreset.height}.mp4`,
         sizeBytes: blob.size,
-        summary: `${resizePreset.width}×${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
+        summary: alreadyOptimized
+          ? `File was already optimized — no compression needed`
+          : `${resizePreset.width}×${resizePreset.height} | ${resizeFrame.label} | ${resizeQuality.label}`,
       })
       setProgress(100)
-      setStatusMessage('Video resize complete. Download is ready.')
+      setStatusMessage(alreadyOptimized ? 'File was already optimized — returning original.' : 'Video resize complete. Download is ready.')
     } catch (error) {
       setErrorMessage(toErrorMessage(error, 'Video resize failed.'))
       setStatusMessage('Video resize failed.')
