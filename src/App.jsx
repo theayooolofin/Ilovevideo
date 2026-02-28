@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
 
 const LARGE_FILE_THRESHOLD_BYTES = 500 * 1024 * 1024
+const FREE_LIMIT = 3
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
@@ -163,6 +164,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [result, setResult] = useState(null)
   const [isDropActive, setIsDropActive] = useState(false)
+  const [usageCount, setUsageCount] = useState(0)
+  const [showLimitModal, setShowLimitModal] = useState(false)
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -217,6 +220,18 @@ function App() {
     },
     [result],
   )
+
+  const fetchUsage = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/my-usage`)
+      if (res.ok) {
+        const data = await res.json()
+        setUsageCount(data.count)
+      }
+    } catch {}
+  }
+
+  useEffect(() => { fetchUsage() }, [])
 
   useEffect(() => {
     setSelectedFile(null)
@@ -364,6 +379,8 @@ function App() {
       return
     }
 
+    if (usageCount >= FREE_LIMIT) { setShowLimitModal(true); return }
+
     setErrorMessage('')
     clearResult()
     setProgress(5)
@@ -404,7 +421,9 @@ function App() {
       })
       setProgress(100)
       setStatusMessage('Compression complete. Download is ready.')
+      fetchUsage()
     } catch (error) {
+      if (error.message && error.message.includes('LIMIT_REACHED')) { setShowLimitModal(true); return; }
       setErrorMessage(toErrorMessage(error, 'Compression failed.'))
       setStatusMessage('Compression failed.')
       setProgress(0)
@@ -597,6 +616,29 @@ function App() {
 
   return (
     <main className="site-shell">
+
+      {showLimitModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '36px 32px', maxWidth: '420px', width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚡</div>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', marginBottom: '12px' }}>Daily Limit Reached</h2>
+            <p style={{ fontSize: '15px', color: '#6b7280', lineHeight: '1.6', marginBottom: '28px' }}>
+              You've used your 3 free compressions today.<br />
+              Sign up to get more tomorrow or upgrade to Pro for unlimited.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+              <button onClick={() => setShowLimitModal(false)}
+                style={{ padding: '12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', fontSize: '15px', fontWeight: '500', color: '#374151', cursor: 'pointer' }}>
+                Remind Me Tomorrow
+              </button>
+              <button onClick={() => setShowLimitModal(false)}
+                style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#2563eb', fontSize: '15px', fontWeight: '600', color: '#fff', cursor: 'pointer' }}>
+                Go Pro → Unlimited
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Navbar ── */}
       <nav className="top-nav">
@@ -814,6 +856,12 @@ function App() {
                     {compressButtonState.text}
                   </button>
                   <p className="status-line">{statusMessage}</p>
+
+                  {isCompressTool && compressMediaType === 'video' && usageCount > 0 && !isProcessing && (
+                    <p style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                      {usageCount} of {FREE_LIMIT} free compressions used today
+                    </p>
+                  )}
 
                   {/* Keep screen on banner */}
                   {isProcessing && selectedFile && isVideoFile(selectedFile) && (
