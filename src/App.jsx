@@ -176,6 +176,7 @@ function App() {
   const [authPassword, setAuthPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -760,7 +761,7 @@ function App() {
       )}
 
       {/* ── Navbar ── */}
-      <nav className="top-nav">
+      <nav className="top-nav" style={{ position: 'relative' }}>
         <div className="top-nav-inner">
           <a href="/" className="nav-logo">
             <div className="nav-logo-icon">
@@ -785,7 +786,45 @@ function App() {
               <button type="button" className="nav-cta" onClick={goToCompressTool}>Try it Free →</button>
             </>
           )}
+          <button
+            type="button"
+            className="nav-hamburger"
+            aria-label="Open menu"
+            onClick={() => setMobileMenuOpen(o => !o)}
+          >
+            {mobileMenuOpen ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
+          </button>
         </div>
+        {mobileMenuOpen && (
+          <>
+            <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
+            <div className="mobile-menu">
+              <a href="#how-it-works" className="mobile-menu-item" onClick={() => setMobileMenuOpen(false)}>How it works</a>
+              {user ? (
+                <>
+                  <span className="mobile-menu-user">{user.email || 'My Account'}</span>
+                  <button type="button" className="mobile-menu-item" onClick={() => { handleSignOut(); setMobileMenuOpen(false) }}>Sign Out</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="mobile-menu-item" onClick={() => { setAuthMode('login'); setAuthError(''); setShowAuthModal(true); setMobileMenuOpen(false) }}>Sign In</button>
+                  <button type="button" className="mobile-menu-cta" onClick={() => { goToCompressTool(); setMobileMenuOpen(false) }}>Try it Free →</button>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </nav>
 
       {/* ── Hero ── */}
@@ -802,6 +841,9 @@ function App() {
           <p className="hero-sub">
             Compress, resize, and optimize videos and images for WhatsApp, TikTok and Instagram Reels — fast, server-side processing. Instant results. Free.
           </p>
+          <button type="button" className="hero-cta-btn" onClick={goToCompressTool}>
+            Try it Free →
+          </button>
           <div className="hero-trust">
             <span className="hero-trust-item">
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -919,7 +961,10 @@ function App() {
                         </>
                       ) : (
                         <>
-                          <p className="upload-title">Drop your {modeLabel.toLowerCase()} here</p>
+                          <p className="upload-title">
+                            <span className="upload-title-desktop">Drop your {modeLabel.toLowerCase()} here</span>
+                            <span className="upload-title-mobile">Tap to upload</span>
+                          </p>
                           <p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p>
                           <span className="upload-formats">{modeHint}</span>
                         </>
@@ -1113,7 +1158,10 @@ function App() {
                         </>
                       ) : (
                         <>
-                          <p className="upload-title">Drop your {modeLabel.toLowerCase()} here</p>
+                          <p className="upload-title">
+                            <span className="upload-title-desktop">Drop your {modeLabel.toLowerCase()} here</span>
+                            <span className="upload-title-mobile">Tap to upload</span>
+                          </p>
                           <p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p>
                           <span className="upload-formats">{modeHint}</span>
                         </>
