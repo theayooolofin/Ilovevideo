@@ -27,18 +27,23 @@ const TOOL_CARDS = [
 const COMPRESSION_PRESETS = [
   {
     id: 'whatsapp',
-    label: 'WhatsApp',
-    details: 'Small files for quick sharing.',
+    label: 'WhatsApp (Smaller File)',
+    details: 'Smaller file size. Downsizes only if wider than 1280px.',
   },
   {
     id: 'instagram-reel',
-    label: 'Instagram Reel',
+    label: 'Instagram (Balanced)',
     details: 'Balanced quality and size.',
   },
   {
     id: 'tiktok',
-    label: 'TikTok',
-    details: 'Higher quality while reducing size.',
+    label: 'TikTok (Balanced)',
+    details: 'Balanced quality while reducing size.',
+  },
+  {
+    id: 'max-quality',
+    label: 'Max Quality (Larger File)',
+    details: 'Near-lossless. Best visual quality, larger file.',
   },
 ]
 
@@ -46,6 +51,7 @@ const IMAGE_COMPRESSION_PRESETS = {
   whatsapp: { maxEdge: 1280, quality: 0.9 },
   'instagram-reel': { maxEdge: 1920, quality: 0.94 },
   tiktok: { maxEdge: 1920, quality: 0.94 },
+  'max-quality': { maxEdge: 9999, quality: 0.98 },
 }
 
 const RESIZE_PRESETS = [
@@ -454,7 +460,7 @@ function App() {
         setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
       }, 1500)
 
-      const presetMap = { 'instagram-reel': 'instagram' }
+      const presetMap = { 'instagram-reel': 'instagram', 'max-quality': 'max-quality' }
       const apiPreset = presetMap[compressionPreset.id] ?? compressionPreset.id
 
       const formData = new FormData()

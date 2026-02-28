@@ -112,9 +112,10 @@ const upload = multer({
 
 // ── Compression presets ──────────────────────────────────────────────────────
 const COMPRESS_PRESETS = {
+  // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-vf', 'scale=-2:720',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
+    '-vf', "scale='min(1280,iw)':-2",
     '-c:a', 'aac', '-b:a', '96k',
     '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
   ],
@@ -128,6 +129,12 @@ const COMPRESS_PRESETS = {
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '25',
     '-vf', 'scale=-2:1080',
     '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
+  ],
+  // Near-lossless: original resolution, CRF 18, high-bitrate audio
+  'max-quality': [
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
+    '-c:a', 'aac', '-b:a', '192k',
     '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
   ],
 };
