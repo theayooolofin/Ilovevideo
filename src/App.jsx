@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
+import posthog from 'posthog-js'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
 
@@ -256,6 +257,7 @@ function App() {
         const data = await res.json()
         setUsageCount(data.count)
         setUsageLimit(data.limit ?? FREE_LIMIT)
+        if (data.is_pro && !isPro) posthog.capture('pro_purchased')
         setIsPro(data.is_pro ?? false)
       }
     } catch {}
@@ -302,6 +304,7 @@ function App() {
     setAuthLoading(false)
     if (error) { setAuthError(error.message); return }
     if (data.session) {
+      posthog.capture('signed_up', { method: 'email' })
       setUser(data.session.user)
       setShowAuthModal(false)
       setAuthEmail('')
@@ -312,6 +315,7 @@ function App() {
   }
 
   const handleGoogleAuth = async () => {
+    posthog.capture('signed_up', { method: 'google' })
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
   }
 
@@ -366,6 +370,7 @@ function App() {
         },
         onClose: () => {},
       })
+      posthog.capture('checkout_started')
       handler.openIframe()
     } catch {
       setErrorMessage('Payment setup failed. Please try again.')
@@ -446,7 +451,7 @@ function App() {
   }
 
   const handleCompress = async () => {
-    if (usageCount >= usageLimit) { setShowLimitModal(true); return; }
+    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
     // ── Image compression (Canvas API, browser-side) ──────────────────────
     if (compressMediaType === 'image') {
       if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
@@ -504,6 +509,7 @@ function App() {
         })
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(100)
+        posthog.capture('compression_completed', { type: compressMediaType })
         try { const h = await getAuthHeaders(); await fetch(`${API_URL}/api/track-usage`, { method: 'POST', headers: h }); fetchUsage(); } catch {}
       } catch (error) {
         setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
@@ -523,7 +529,7 @@ function App() {
       return
     }
 
-    if (usageCount >= usageLimit) { setShowLimitModal(true); return }
+    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
 
     setErrorMessage('')
     clearResult()
@@ -565,6 +571,7 @@ function App() {
         summary: `Preset: ${compressionPreset.label}${savings !== '0' ? ` · ${savings}% smaller` : ''}`,
       })
       setProgress(100)
+      posthog.capture('compression_completed', { type: compressMediaType })
       setStatusMessage('Compression complete. Download is ready.')
       fetchUsage()
     } catch (error) {
@@ -636,7 +643,7 @@ function App() {
   }
 
   const handleResizeImage = async () => {
-    if (usageCount >= usageLimit) { setShowLimitModal(true); return; }
+    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
     if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
       setErrorMessage('Please select an image file for image resize mode.')
       return
