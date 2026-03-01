@@ -264,15 +264,14 @@ function App() {
     } catch {}
   }
 
-  const postStats = async (type, originalBytes, compressedBytes) => {
+  const postStats = async (type, mbSaved) => {
     try {
-      const mbSaved = Math.max(0, (originalBytes - compressedBytes) / 1048576)
       const headers = await getAuthHeaders()
       headers['Content-Type'] = 'application/json'
       await fetch(`${API_URL}/api/stats`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ type, mb_saved: mbSaved }),
+        body: JSON.stringify({ type, mb_saved: Math.max(0, mbSaved) }),
       })
     } catch {}
   }
@@ -524,7 +523,7 @@ function App() {
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(100)
         posthog.capture('compression_completed', { type: compressMediaType })
-        postStats(compressMediaType, selectedFile.size, blob.size)
+        await postStats('image', (selectedFile.size - blob.size) / 1048576)
         try { const h = await getAuthHeaders(); await fetch(`${API_URL}/api/track-usage`, { method: 'POST', headers: h }); fetchUsage(); } catch {}
       } catch (error) {
         setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
@@ -587,7 +586,7 @@ function App() {
       })
       setProgress(100)
       posthog.capture('compression_completed', { type: compressMediaType })
-      postStats(compressMediaType, originalSize, compressedSize ?? originalSize)
+      await postStats('video', (originalSize - (compressedSize || 0)) / 1048576)
       setStatusMessage('Compression complete. Download is ready.')
       fetchUsage()
     } catch (error) {
