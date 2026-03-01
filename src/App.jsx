@@ -185,6 +185,8 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isPro, setIsPro] = useState(false)
   const [proPrice, setProPrice] = useState('$4.99')
+  const [showAccountModal, setShowAccountModal] = useState(false)
+  const [accountInfo, setAccountInfo] = useState(null)
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -315,6 +317,25 @@ function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
+  }
+
+  const openAccountModal = async () => {
+    setShowAccountModal(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${API_URL}/api/me`, { headers })
+      if (res.ok) setAccountInfo(await res.json())
+    } catch {}
+  }
+
+  const handleCancelPro = async () => {
+    try {
+      const headers = await getAuthHeaders()
+      headers['Content-Type'] = 'application/json'
+      await fetch(`${API_URL}/api/cancel-pro`, { method: 'POST', headers })
+      await fetchUsage()
+      setAccountInfo(prev => prev ? { ...prev, is_pro: false, pro_since: null, paystack_ref: null } : prev)
+    } catch {}
   }
 
   const handleGoPro = async () => {
@@ -776,6 +797,44 @@ function App() {
         </div>
       )}
 
+      {showAccountModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAccountModal(false) }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '36px 32px', maxWidth: '420px', width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: 0 }}>My Account</h2>
+              <button onClick={() => setShowAccountModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#6b7280', lineHeight: 1 }}>✕</button>
+            </div>
+            <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px', wordBreak: 'break-all' }}>{accountInfo?.email ?? user?.email}</p>
+            <div style={{ marginBottom: '24px' }}>
+              {(accountInfo?.is_pro ?? isPro) ? (
+                <span style={{ display: 'inline-block', background: '#d1fae5', color: '#065f46', fontSize: '13px', fontWeight: '700', padding: '4px 12px', borderRadius: '999px' }}>⚡ Pro</span>
+              ) : (
+                <span style={{ display: 'inline-block', background: '#f3f4f6', color: '#6b7280', fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '999px' }}>Free</span>
+              )}
+            </div>
+            {(accountInfo?.is_pro ?? isPro) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {accountInfo?.pro_since && (
+                  <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                    Pro since {new Date(accountInfo.pro_since).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                )}
+                <button onClick={handleCancelPro}
+                  style={{ padding: '11px', borderRadius: '10px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                  Cancel Pro
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => { setShowAccountModal(false); handleGoPro() }}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>
+                Go Pro → Unlimited ({proPrice}/mo)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {showAuthModal && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
@@ -852,7 +911,7 @@ function App() {
           <div className="nav-divider" />
           {user ? (
             <>
-              <span style={{ fontSize: '13px', color: '#6b7280', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+              <button type="button" onClick={openAccountModal} style={{ fontSize: '13px', color: '#6b7280', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>{user.email}</button>
               <button type="button" className="nav-link" style={{ marginLeft: '12px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={handleSignOut}>Sign Out</button>
             </>
           ) : (
@@ -889,7 +948,7 @@ function App() {
               <a href="#how-it-works" className="mobile-menu-item" onClick={() => setMobileMenuOpen(false)}>How it works</a>
               {user ? (
                 <>
-                  <span className="mobile-menu-user">{user.email || 'My Account'}</span>
+                  <button type="button" className="mobile-menu-user" style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }} onClick={() => { openAccountModal(); setMobileMenuOpen(false) }}>{user.email || 'My Account'}</button>
                   <button type="button" className="mobile-menu-item" onClick={() => { handleSignOut(); setMobileMenuOpen(false) }}>Sign Out</button>
                 </>
               ) : (

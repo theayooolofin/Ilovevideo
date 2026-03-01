@@ -438,6 +438,37 @@ app.post('/api/paystack-webhook', async (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// ── Account routes ───────────────────────────────────────────────────────────
+app.get('/api/me', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('is_pro, pro_since, paystack_ref')
+    .eq('id', user.id)
+    .single();
+
+  res.json({
+    email: user.email,
+    is_pro: profile?.is_pro ?? false,
+    pro_since: profile?.pro_since ?? null,
+    paystack_ref: profile?.paystack_ref ?? null,
+  });
+});
+
+app.post('/api/cancel-pro', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({ is_pro: false, pro_since: null, paystack_ref: null })
+    .eq('id', user.id);
+
+  res.json({ ok: true });
+});
+
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
