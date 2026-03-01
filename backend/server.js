@@ -355,6 +355,7 @@ const GEO_PRICING = {
   GH: { currency: 'GHS', amount: 7999,   display: 'GH₵79.99' },
   ZA: { currency: 'ZAR', amount: 8999,   display: 'R89.99' },
   KE: { currency: 'KES', amount: 64900,  display: 'KES 649' },
+  EG: { currency: 'EGP', amount: 24900,  display: 'EGP 249' },
 };
 const DEFAULT_PRICING = { currency: 'USD', amount: 499, display: '$4.99' };
 
