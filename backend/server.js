@@ -469,6 +469,34 @@ app.post('/api/cancel-pro', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Stats routes ─────────────────────────────────────────────────────────────
+app.get('/api/stats', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('total_compressions, total_videos_compressed, total_images_compressed, total_mb_saved')
+    .eq('id', user.id)
+    .single();
+
+  res.json(data || { total_compressions: 0, total_videos_compressed: 0, total_images_compressed: 0, total_mb_saved: 0 });
+});
+
+app.post('/api/stats', async (req, res) => {
+  const user = await resolveUser(req);
+  if (!user) return res.status(401).json({ error: 'Authentication required' });
+
+  const { type, mb_saved } = req.body;
+  await supabaseAdmin.rpc('increment_compression_stats', {
+    p_user_id:  user.id,
+    p_type:     type || 'video',
+    p_mb_saved: parseFloat(mb_saved) || 0,
+  });
+
+  res.json({ ok: true });
+});
+
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {

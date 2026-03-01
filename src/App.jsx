@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import posthog from 'posthog-js'
+import StatsBar from './components/StatsBar'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
 
@@ -263,6 +264,19 @@ function App() {
     } catch {}
   }
 
+  const postStats = async (type, originalBytes, compressedBytes) => {
+    try {
+      const mbSaved = Math.max(0, (originalBytes - compressedBytes) / 1048576)
+      const headers = await getAuthHeaders()
+      headers['Content-Type'] = 'application/json'
+      await fetch(`${API_URL}/api/stats`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ type, mb_saved: mbSaved }),
+      })
+    } catch {}
+  }
+
   const fetchPricing = async () => {
     try {
       const res = await fetch(`${API_URL}/api/pricing`)
@@ -510,6 +524,7 @@ function App() {
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(100)
         posthog.capture('compression_completed', { type: compressMediaType })
+        postStats(compressMediaType, selectedFile.size, blob.size)
         try { const h = await getAuthHeaders(); await fetch(`${API_URL}/api/track-usage`, { method: 'POST', headers: h }); fetchUsage(); } catch {}
       } catch (error) {
         setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
@@ -572,6 +587,7 @@ function App() {
       })
       setProgress(100)
       posthog.capture('compression_completed', { type: compressMediaType })
+      postStats(compressMediaType, originalSize, compressedSize ?? originalSize)
       setStatusMessage('Compression complete. Download is ready.')
       fetchUsage()
     } catch (error) {
@@ -968,6 +984,7 @@ function App() {
           </>
         )}
       </nav>
+      {user && <StatsBar key={user.id} />}
 
       {/* ── Hero ── */}
       <section className="hero-section">
