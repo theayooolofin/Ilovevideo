@@ -349,18 +349,45 @@ app.post('/api/resize', upload.single('video'), async (req, res) => {
   runFFmpeg(args, inputPath, outputPath, res, req, { sizeGuard: true });
 });
 
+// ── Geo pricing ───────────────────────────────────────────────────────────────
+const GEO_PRICING = {
+  NG: { currency: 'NGN', amount: 799900, display: '₦7,999' },
+  GH: { currency: 'GHS', amount: 7999,   display: 'GH₵79.99' },
+  ZA: { currency: 'ZAR', amount: 8999,   display: 'R89.99' },
+  KE: { currency: 'KES', amount: 64900,  display: 'KES 649' },
+};
+const DEFAULT_PRICING = { currency: 'USD', amount: 499, display: '$4.99' };
+
+async function getPricingForIp(ip) {
+  try {
+    const cleanIp = (!ip || ip === '::1' || ip === '127.0.0.1') ? '' : ip;
+    const res = await fetch(`http://ip-api.com/json/${cleanIp}?fields=countryCode`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    const { countryCode } = await res.json();
+    return GEO_PRICING[countryCode] || DEFAULT_PRICING;
+  } catch {
+    return DEFAULT_PRICING;
+  }
+}
+
 // ── Payment routes ───────────────────────────────────────────────────────────
+app.get('/api/pricing', async (req, res) => {
+  const pricing = await getPricingForIp(getClientIp(req));
+  res.json(pricing);
+});
+
 app.post('/api/create-payment', async (req, res) => {
   const user = await resolveUser(req);
   if (!user) return res.status(401).json({ error: 'Authentication required' });
 
+  const pricing = await getPricingForIp(getClientIp(req));
   const reference = `ilv-${user.id}-${Date.now()}`;
 
   res.json({
     public_key: process.env.PAYSTACK_PUBLIC_KEY,
     email: user.email,
-    amount: 499,        // Paystack expects cents: $4.99 = 499
-    currency: 'USD',
+    ...pricing,
     reference,
   });
 });

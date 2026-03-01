@@ -184,6 +184,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isPro, setIsPro] = useState(false)
+  const [proPrice, setProPrice] = useState('$4.99')
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -258,8 +259,19 @@ function App() {
     } catch {}
   }
 
+  const fetchPricing = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/pricing`)
+      if (res.ok) {
+        const data = await res.json()
+        setProPrice(data.display)
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     // Subscribe to auth state — fires immediately with current session
+    fetchPricing()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
@@ -747,7 +759,7 @@ function App() {
             <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
               <button onClick={handleGoPro}
                 style={{ padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>
-                Go Pro — Unlimited ($4.99/mo)
+                Go Pro — Unlimited ({proPrice}/mo)
               </button>
               {!user && (
                 <button onClick={() => { setShowLimitModal(false); setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }}
