@@ -413,6 +413,7 @@ function App() {
   }
 
   const handleCompress = async () => {
+    if (usageCount >= usageLimit) { setShowLimitModal(true); return; }
     // ── Image compression (Canvas API, browser-side) ──────────────────────
     if (compressMediaType === 'image') {
       if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
@@ -470,6 +471,7 @@ function App() {
         })
         setStatusMessage('Image optimization complete. Download is ready.')
         setProgress(100)
+        try { const h = await getAuthHeaders(); await fetch(`${API_URL}/api/track-usage`, { method: 'POST', headers: h }); fetchUsage(); } catch {}
       } catch (error) {
         setErrorMessage(toErrorMessage(error, 'Image optimization failed.'))
         setStatusMessage('Image optimization failed.')
@@ -601,6 +603,7 @@ function App() {
   }
 
   const handleResizeImage = async () => {
+    if (usageCount >= usageLimit) { setShowLimitModal(true); return; }
     if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
       setErrorMessage('Please select an image file for image resize mode.')
       return
@@ -658,6 +661,7 @@ function App() {
 
       setStatusMessage('Image resize complete. High-quality output is ready.')
       setProgress(100)
+      try { const h = await getAuthHeaders(); await fetch(`${API_URL}/api/track-usage`, { method: 'POST', headers: h }); fetchUsage(); } catch {}
     } catch (error) {
       setErrorMessage(toErrorMessage(error, 'Image resize failed.'))
       setStatusMessage('Image resize failed.')

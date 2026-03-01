@@ -276,6 +276,17 @@ app.get('/api/my-usage', async (req, res) => {
   });
 });
 
+app.post('/api/track-usage', async (req, res) => {
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
+  if (isPro) return res.json({ ok: true });
+  const usage = getUsageForKey(key);
+  if (usage.count >= limit) {
+    return res.status(429).json({ error: 'LIMIT_REACHED', limit });
+  }
+  incrementUsageForKey(key);
+  res.json({ ok: true });
+});
+
 app.post('/api/compress', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
 
