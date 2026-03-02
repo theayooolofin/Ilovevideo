@@ -11,6 +11,7 @@ const USER_LIMIT = 10
 
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
+  { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: false },
   {
     id: 'remove-audio',
@@ -214,6 +215,7 @@ function App() {
   const fileAccept = useMemo(() => {
     if (selectedTool === 'compress') return compressMediaType === 'image' ? 'image/*' : 'video/*'
     if (selectedTool === 'resize') return resizeMediaType === 'image' ? 'image/*' : 'video/*'
+    if (selectedTool === 'convert') return 'video/quicktime,video/x-matroska,video/x-msvideo,video/webm,.mov,.mkv,.avi,.webm'
     return 'video/*,image/*'
   }, [selectedTool, resizeMediaType, compressMediaType])
 
@@ -415,6 +417,10 @@ function App() {
       )
       return
     }
+    if (selectedTool === 'convert') {
+      setStatusMessage('Upload a MOV, MKV, AVI, or WEBM file to convert to MP4.')
+      return
+    }
     setStatusMessage('This tool is coming soon.')
   }, [selectedTool, resizeMediaType, compressMediaType])
 
@@ -427,6 +433,7 @@ function App() {
     }
     if (selectedTool === 'resize' && resizeMediaType === 'video' && !isVideoFile(file)) return 'Video resize mode accepts only video files.'
     if (selectedTool === 'resize' && resizeMediaType === 'image' && !isImageFile(file)) return 'Image resize mode accepts only image files.'
+    if (selectedTool === 'convert' && !isVideoFile(file)) return 'Convert tool accepts only video files (MOV, MKV, AVI, WEBM).'
     return ''
   }
 
@@ -738,6 +745,61 @@ function App() {
     await handleResizeImage()
   }
 
+  const handleConvert = async () => {
+    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
+    if (!selectedFile || !isVideoFile(selectedFile)) {
+      setErrorMessage('Please select a video file first.')
+      return
+    }
+
+    setErrorMessage('')
+    clearResult()
+    setProgress(5)
+    setIsProcessing(true)
+
+    let progressInterval = null
+    try {
+      setStatusMessage('Converting to MP4...')
+      progressInterval = setInterval(() => {
+        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
+      }, 1500)
+
+      const formData = new FormData()
+      formData.append('video', selectedFile)
+
+      const convertHeaders = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/convert`, { method: 'POST', body: formData, mode: 'cors', headers: convertHeaders })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Server error: ${response.status}`)
+      }
+
+      setProgress(95)
+      const convertedSize = parseInt(response.headers.get('X-Converted-Size') || '0') || null
+      const blob = await response.blob()
+      const downloadUrl = URL.createObjectURL(blob)
+
+      setResult({
+        url: downloadUrl,
+        fileName: `${baseName(selectedFile.name)}-converted.mp4`,
+        sizeBytes: convertedSize ?? blob.size,
+        summary: 'Converted to MP4 (H.264 + AAC)',
+      })
+      setProgress(100)
+      posthog.capture('conversion_completed', { type: 'convert' })
+      setStatusMessage('Conversion complete. Download is ready.')
+      fetchUsage()
+    } catch (error) {
+      if (error.message && error.message.includes('LIMIT_REACHED')) { setShowLimitModal(true); return }
+      setErrorMessage(toErrorMessage(error, 'Conversion failed.'))
+      setStatusMessage('Conversion failed.')
+      setProgress(0)
+    } finally {
+      if (progressInterval) clearInterval(progressInterval)
+      setIsProcessing(false)
+    }
+  }
+
   const handleDownload = async () => {
     if (!result) return
     try {
@@ -759,7 +821,8 @@ function App() {
 
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
-  const activeToolImplemented = isCompressTool || isResizeTool
+  const isConvertTool = selectedTool === 'convert'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -773,22 +836,32 @@ function App() {
     if (resizeMediaType === 'video') return { text: 'Process Video →', disabled: false }
     return { text: 'Process Image →', disabled: false }
   }
+  const getConvertButtonState = () => {
+    if (!selectedFile) return { text: 'Choose a File First', disabled: true }
+    if (isProcessing) return { text: progressPercent > 0 ? `Converting... ${progressPercent}%` : 'Starting...', disabled: true }
+    return { text: 'Convert to MP4 →', disabled: false }
+  }
   const compressButtonState = getCompressButtonState()
   const resizeButtonState = getResizeButtonState()
+  const convertButtonState = getConvertButtonState()
   const modeLabel = isCompressTool
     ? compressMediaType === 'video'
       ? 'Video File'
       : 'Image File'
-    : resizeMediaType === 'video'
+    : isConvertTool
       ? 'Video File'
-      : 'Image File'
+      : resizeMediaType === 'video'
+        ? 'Video File'
+        : 'Image File'
   const modeHint = isCompressTool
     ? compressMediaType === 'video'
       ? 'Supports MP4, MOV, AVI and more'
       : 'Supports JPG, PNG, WEBP and more'
-    : resizeMediaType === 'video'
-      ? 'Supports MP4, MOV, AVI and more'
-      : 'Supports JPG, PNG, WEBP and more'
+    : isConvertTool
+      ? 'Supports MOV, MKV, AVI, WEBM'
+      : resizeMediaType === 'video'
+        ? 'Supports MP4, MOV, AVI and more'
+        : 'Supports JPG, PNG, WEBP and more'
 
   return (
     <main className="site-shell">
@@ -1423,6 +1496,128 @@ function App() {
                 </>
               )}
 
+              {isConvertTool && (
+                <>
+                  {/* Panel Header */}
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 4v6h6M20 20v-6h-6M3.51 9a9 9 0 0 1 14.85-3.36L20 8M4 16l1.64 2.36A9 9 0 0 0 20.49 15" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Convert to MP4</p>
+                      <p className="panel-desc">Upload a MOV, MKV, AVI, or WEBM — get a clean MP4 back.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+
+                  {/* Upload Zone */}
+                  <div>
+                    <span className="field-label">Upload File</span>
+                    <label
+                      htmlFor="media-input"
+                      className={`upload-zone${isDropActive ? ' dragging' : ''}${selectedFile ? ' has-file' : ''}`}
+                      onDragEnter={handleDragOver}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <input id="media-input" type="file" accept={fileAccept} onChange={handleFileChange} className="sr-only" />
+                      <div className="upload-icon-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      {selectedFile ? (
+                        <>
+                          <p className="upload-title" style={{ color: '#065f46' }}>{selectedFile.name}</p>
+                          <p className="upload-hint">{formatBytes(selectedFile.size)} · Click to change</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="upload-title">
+                            <span className="upload-title-desktop">Drop your {modeLabel.toLowerCase()} here</span>
+                            <span className="upload-title-mobile">Tap to upload</span>
+                          </p>
+                          <p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p>
+                          <span className="upload-formats">{modeHint}</span>
+                        </>
+                      )}
+                    </label>
+                    {showLargeFileWarning && (
+                      <div className="large-file-warning">
+                        <strong>⚠️ Large file ({largeFileSizeMB} MB).</strong> Files over 100 MB may fail to upload. For best results, use a file under 100 MB.
+                      </div>
+                    )}
+                    {isProcessing && (
+                      <div className="progress-wrap">
+                        <p className="progress-live-label">
+                          {`Converting... ${progressPercent}%`}
+                        </p>
+                        <div className="progress-track">
+                          <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    onClick={handleConvert}
+                    disabled={convertButtonState.disabled}
+                    className="action-btn"
+                  >
+                    {isProcessing && (
+                      <span className="action-spinner" />
+                    )}
+                    {convertButtonState.text}
+                  </button>
+                  <p className="status-line">{statusMessage}</p>
+
+                  {/* Keep screen on banner */}
+                  {isProcessing && (
+                    <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                      ⚠️ Keep this page open and your screen on during conversion
+                    </div>
+                  )}
+
+                  {/* Output Card */}
+                  {result && (
+                    <div className="output-card success">
+                      <div className="output-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
+                      </div>
+                      <div className="output-body">
+                        <p className="output-title">Output Ready</p>
+                        <p className="output-meta">
+                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
+                          {result.summary && ` · ${result.summary}`}
+                        </p>
+                        <button type="button" onClick={handleDownload} className="download-btn">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          Download MP4
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Card */}
+                  {errorMessage && (
+                    <div className="output-card error">
+                      <div className="output-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg>
+                      </div>
+                      <div className="output-body">
+                        <p className="output-title">Processing Error</p>
+                        <p className="output-meta">{errorMessage}</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-16 text-center">
@@ -1485,6 +1680,7 @@ function App() {
             <p className="footer-col-label">Tools</p>
             <div className="footer-links">
               <a href="#tool-panel" onClick={() => setSelectedTool('compress')} className="footer-link">Compress Video</a>
+              <a href="#tool-panel" onClick={() => setSelectedTool('convert')} className="footer-link">Convert to MP4</a>
               <a href="#tool-panel" onClick={() => setSelectedTool('resize')} className="footer-link">Resize for Social</a>
               <span className="footer-link" style={{ cursor: 'default' }}>Trim Video <span className="footer-link-soon">Soon</span></span>
               <span className="footer-link" style={{ cursor: 'default' }}>Remove Audio <span className="footer-link-soon">Soon</span></span>

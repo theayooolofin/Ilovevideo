@@ -349,6 +349,35 @@ app.post('/api/resize', upload.single('video'), async (req, res) => {
   runFFmpeg(args, inputPath, outputPath, res, req, { sizeGuard: true });
 });
 
+app.post('/api/convert', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
+  const usage = getUsageForKey(key);
+
+  if (!isPro && usage.count >= limit) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(429).json({ error: 'LIMIT_REACHED', limit });
+  }
+  incrementUsageForKey(key);
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `converted-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+  res.setHeader('Content-Disposition', 'attachment; filename="ilovevideo-converted.mp4"');
+
+  const args = [
+    '-i', inputPath,
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-c:a', 'aac',
+    '-movflags', '+faststart',
+    outputPath,
+  ];
+
+  runFFmpeg(args, inputPath, outputPath, res, req);
+});
+
 // ── Geo pricing ───────────────────────────────────────────────────────────────
 const GEO_PRICING = {
   NG: { currency: 'NGN', amount: 799900, display: '₦7,999' },
