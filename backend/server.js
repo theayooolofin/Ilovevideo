@@ -484,18 +484,32 @@ app.get('/api/stats', async (req, res) => {
 });
 
 app.post('/api/stats', async (req, res) => {
-  const user = await resolveUser(req);
-  if (!user) return res.status(401).json({ error: 'Authentication required' });
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !user) {
+    console.error('POST /api/stats auth error', userError);
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const { type, mb_saved } = req.body;
+  if (type !== 'video' && type !== 'image') {
+    return res.status(400).json({ error: 'type must be video or image' });
+  }
+  if (!Number.isFinite(mb_saved) || mb_saved < 0) {
+    return res.status(400).json({ error: 'mb_saved must be a finite number >= 0' });
+  }
+
   const { error } = await supabaseAdmin.rpc('increment_compression_stats', {
-    p_user_id:  user.id,
-    p_type:     type || 'video',
-    p_mb_saved: parseFloat(mb_saved) || 0,
+    user_id:   user.id,
+    p_type:    type,
+    p_mb_saved: mb_saved,
   });
 
   if (error) {
-    console.error('POST /api/stats error', error);
+    console.error('POST /api/stats RPC error', error);
     return res.status(500).json({ error: 'Failed to update stats' });
   }
 
