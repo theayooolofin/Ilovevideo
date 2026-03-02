@@ -488,13 +488,18 @@ app.post('/api/stats', async (req, res) => {
   if (!user) return res.status(401).json({ error: 'Authentication required' });
 
   const { type, mb_saved } = req.body;
-  await supabaseAdmin.rpc('increment_compression_stats', {
+  const { error } = await supabaseAdmin.rpc('increment_compression_stats', {
     p_user_id:  user.id,
     p_type:     type || 'video',
     p_mb_saved: parseFloat(mb_saved) || 0,
   });
 
-  res.json({ ok: true });
+  if (error) {
+    console.error('POST /api/stats error', error);
+    return res.status(500).json({ error: 'Failed to update stats' });
+  }
+
+  return res.status(204).send();
 });
 
 // ── Error handler ────────────────────────────────────────────────────────────
