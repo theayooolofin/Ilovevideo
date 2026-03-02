@@ -827,9 +827,33 @@ function App() {
     }
   }
 
-  const handleWhatsAppShare = () => {
-    const message = 'Check out this video I compressed with iLoveVideo! 📱\nhttps://ilovevideo.fun'
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener')
+  const handleWhatsAppShare = async () => {
+    const text = 'Check out this video I compressed with iLoveVideo! 📱'
+    const url = 'https://ilovevideo.fun'
+    const waFallback = () => window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`, '_blank', 'noopener')
+
+    if (!navigator.share) { waFallback(); return }
+
+    // Mobile: try sharing the actual file blob
+    if (result?.url && navigator.canShare) {
+      try {
+        const response = await fetch(result.url)
+        const blob = await response.blob()
+        const fileName = result.fileName || 'ilovevideo-compressed.mp4'
+        const file = new File([blob], fileName, { type: blob.type })
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'iLoveVideo', text })
+          return
+        }
+      } catch {}
+    }
+
+    // Fallback: share text + URL (no file)
+    try {
+      await navigator.share({ title: 'iLoveVideo', text, url })
+    } catch (err) {
+      if (err.name !== 'AbortError') waFallback()
+    }
   }
 
   const goToCompressTool = () => {
