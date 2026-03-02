@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const { Resend } = require('resend');
 
 const app = express();
 
@@ -543,6 +544,142 @@ app.post('/api/stats', async (req, res) => {
   }
 
   return res.status(204).send();
+});
+
+// ── Resend email client ──────────────────────────────────────────────────────
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM = 'iLoveVideo <hello@ilovevideo.fun>';
+
+// In-memory dedup — prevents double welcome sequences on the same server process
+const welcomeSent = new Set();
+
+const scheduleAt = (days) =>
+  new Date(Date.now() + days * 86_400_000).toISOString();
+
+// ── Email templates ──────────────────────────────────────────────────────────
+function emailWrap(body) {
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f4ff;font-family:Arial,sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:24px">
+<div style="background:#fff;border-radius:12px;padding:32px 28px">
+${body}
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0 16px">
+<p style="color:#9ca3af;font-size:12px;margin:0">iLoveVideo &middot; <a href="https://ilovevideo.fun" style="color:#9ca3af">ilovevideo.fun</a><br>
+You're receiving this because you created a free account.</p>
+</div></div></body></html>`;
+}
+
+const CTA_BTN = (text, url) =>
+  `<a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;padding:13px 26px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-top:16px">${text}</a>`;
+
+const emails = [
+  {
+    days: 0,
+    subject: 'Welcome to iLoveVideo 🎬',
+    html: emailWrap(`
+      <h1 style="color:#2563eb;font-size:24px;margin:0 0 16px">Welcome to iLoveVideo 🎬</h1>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px">You just joined thousands of creators who compress videos for WhatsApp, TikTok, and Instagram — without losing quality.</p>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 16px">Here's what you can do right now:</p>
+      <ul style="color:#374151;font-size:15px;line-height:2.2;padding-left:20px;margin:0 0 16px">
+        <li>🗜️ Compress a video for WhatsApp (under 16 MB)</li>
+        <li>📐 Resize for Instagram Reels or TikTok (9:16)</li>
+        <li>🎬 Convert MOV / MKV / AVI → MP4</li>
+      </ul>
+      <p style="color:#374151;font-size:15px;margin:0 0 4px">Your free account includes <strong>10 compressions/day</strong>.</p>
+      ${CTA_BTN('Compress Your First Video →', 'https://ilovevideo.fun')}
+    `),
+  },
+  {
+    days: 2,
+    subject: 'Your WhatsApp videos are probably too big 📱',
+    html: emailWrap(`
+      <h2 style="color:#111827;font-size:22px;margin:0 0 16px">WhatsApp rejects videos over 16 MB 📱</h2>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px">Most phones record at 4K or 1080p — that's 200 MB+ for a 2-minute clip. WhatsApp cuts it off, downgrades quality, or refuses to send it entirely.</p>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px"><strong>The fix takes 30 seconds:</strong></p>
+      <ol style="color:#374151;font-size:15px;line-height:2.2;padding-left:20px;margin:0 0 16px">
+        <li>Upload your video to iLoveVideo</li>
+        <li>Pick the <strong>WhatsApp</strong> preset</li>
+        <li>Download and send — done</li>
+      </ol>
+      <p style="color:#374151;font-size:15px;margin:0 0 4px">Your video stays sharp. File size drops by up to 80%.</p>
+      ${CTA_BTN('Try the WhatsApp Preset →', 'https://ilovevideo.fun')}
+    `),
+  },
+  {
+    days: 4,
+    subject: 'How creators send perfect videos every time 🎥',
+    html: emailWrap(`
+      <h2 style="color:#111827;font-size:22px;margin:0 0 16px">The secret to perfect social videos 🎥</h2>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px">Every platform has different rules:</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 16px">
+        <tr style="background:#f3f4f6"><th style="padding:10px;text-align:left;color:#374151">Platform</th><th style="padding:10px;text-align:left;color:#374151">Max Size</th><th style="padding:10px;text-align:left;color:#374151">Best Format</th></tr>
+        <tr><td style="padding:10px;border-top:1px solid #e5e7eb">WhatsApp</td><td style="padding:10px;border-top:1px solid #e5e7eb">16 MB</td><td style="padding:10px;border-top:1px solid #e5e7eb">MP4 H.264</td></tr>
+        <tr style="background:#f9fafb"><td style="padding:10px;border-top:1px solid #e5e7eb">Instagram Reels</td><td style="padding:10px;border-top:1px solid #e5e7eb">100 MB</td><td style="padding:10px;border-top:1px solid #e5e7eb">MP4 9:16</td></tr>
+        <tr><td style="padding:10px;border-top:1px solid #e5e7eb">TikTok</td><td style="padding:10px;border-top:1px solid #e5e7eb">287 MB</td><td style="padding:10px;border-top:1px solid #e5e7eb">MP4 9:16</td></tr>
+      </table>
+      <p style="color:#374151;font-size:15px;margin:0 0 4px">iLoveVideo handles every preset automatically — no manual settings needed.</p>
+      ${CTA_BTN('Compress a Video Now →', 'https://ilovevideo.fun')}
+    `),
+  },
+  {
+    days: 6,
+    subject: 'Running low on free compressions? 📊',
+    html: emailWrap(`
+      <h2 style="color:#111827;font-size:22px;margin:0 0 16px">You've been busy compressing 🚀</h2>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px">Free accounts get 10 compressions per day. If you're hitting that limit, you already know iLoveVideo saves you time.</p>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 16px"><strong>Go Pro and get:</strong></p>
+      <ul style="color:#374151;font-size:15px;line-height:2.2;padding-left:20px;margin:0 0 16px">
+        <li>✅ Unlimited compressions every day</li>
+        <li>✅ All presets: WhatsApp, TikTok, Instagram, Max Quality</li>
+        <li>✅ Format conversion (MOV → MP4, MKV → MP4)</li>
+        <li>✅ Priority processing</li>
+      </ul>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 4px">All of that for <strong>₦7,999/month</strong>.</p>
+      ${CTA_BTN('See Pro Plan →', 'https://ilovevideo.fun')}
+    `),
+  },
+  {
+    days: 9,
+    subject: 'Unlimited video compression — ₦7,999/month ⚡',
+    html: emailWrap(`
+      <h2 style="color:#111827;font-size:22px;margin:0 0 16px">Stop hitting the daily limit ⚡</h2>
+      <p style="color:#374151;font-size:16px;line-height:1.7;margin:0 0 12px">You've been on the free plan for 9 days. If you're compressing videos regularly, the 10/day limit is slowing you down.</p>
+      <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:16px 20px;margin:0 0 20px">
+        <p style="color:#92400e;font-size:16px;font-weight:700;margin:0 0 4px">iLoveVideo Pro</p>
+        <p style="color:#92400e;font-size:15px;margin:0">Unlimited compressions · All formats · ₦7,999/month</p>
+      </div>
+      <p style="color:#374151;font-size:15px;margin:0 0 4px">That's less than ₦270/day for unlimited video compression. Cancel anytime.</p>
+      ${CTA_BTN('Go Pro Now — ₦7,999/month →', 'https://ilovevideo.fun')}
+      <p style="color:#6b7280;font-size:13px;margin-top:16px">This is the last email in this series. We'll only email you about important account updates from now on.</p>
+    `),
+  },
+];
+
+// ── Welcome email sequence ────────────────────────────────────────────────────
+app.post('/api/send-welcome', async (req, res) => {
+  const { email } = req.body;
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email required' });
+  }
+
+  const key = email.toLowerCase().trim();
+  if (welcomeSent.has(key)) {
+    return res.json({ ok: true, skipped: true });
+  }
+  welcomeSent.add(key);
+
+  try {
+    for (const { days, subject, html } of emails) {
+      const payload = { from: FROM, to: key, subject, html };
+      if (days > 0) payload.scheduledAt = scheduleAt(days);
+      await resend.emails.send(payload);
+    }
+    console.log(`📧 Welcome sequence sent to ${key}`);
+    res.json({ ok: true });
+  } catch (err) {
+    welcomeSent.delete(key); // allow retry
+    console.error('send-welcome error:', err.message);
+    res.status(500).json({ error: 'Failed to send welcome email' });
+  }
 });
 
 // ── Error handler ────────────────────────────────────────────────────────────

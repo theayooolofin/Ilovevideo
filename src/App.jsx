@@ -298,6 +298,17 @@ function App() {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       fetchUsage()
+      // Send welcome sequence for new Google OAuth signups (account created within last 60s)
+      if (_event === 'SIGNED_IN' && session?.user?.email) {
+        const ageMs = Date.now() - new Date(session.user.created_at).getTime()
+        if (ageMs < 60_000) {
+          fetch(`${API_URL}/api/send-welcome`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: session.user.email }),
+          }).catch(() => {})
+        }
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -323,6 +334,11 @@ function App() {
     if (error) { setAuthError(error.message); return }
     if (data.session) {
       posthog.capture('signed_up', { method: 'email' })
+      fetch(`${API_URL}/api/send-welcome`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.session.user.email }),
+      }).catch(() => {})
       setUser(data.session.user)
       setShowAuthModal(false)
       setAuthEmail('')
