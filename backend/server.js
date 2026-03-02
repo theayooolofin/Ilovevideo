@@ -148,28 +148,28 @@ const upload = multer({
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '28',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
     '-vf', "scale='min(1280,iw)':-2",
-    '-c:a', 'aac', '-b:a', '96k',
-    '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-vf', 'scale=-2:1080',
-    '-c:a', 'aac', '-b:a', '128k',
-    '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-vf', "scale='min(1920,iw)':-2",
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '25',
-    '-vf', 'scale=-2:1080',
-    '-c:a', 'aac', '-b:a', '128k',
-    '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-vf', "scale='min(1920,iw)':-2",
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', '-threads', '0',
   ],
-  // Near-lossless: original resolution, CRF 18, high-bitrate audio
+  // Visually lossless: original resolution, no scaling
   'max-quality': [
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '18',
-    '-c:a', 'aac', '-b:a', '192k',
-    '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', '-threads', '0',
   ],
 };
 
@@ -369,8 +369,8 @@ app.post('/api/convert', upload.single('video'), async (req, res) => {
 
   const args = [
     '-i', inputPath,
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-c:a', 'aac',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart',
     outputPath,
   ];

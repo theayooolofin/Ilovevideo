@@ -51,9 +51,9 @@ const COMPRESSION_PRESETS = [
 ]
 
 const IMAGE_COMPRESSION_PRESETS = {
-  whatsapp: { maxEdge: 1280, quality: 0.9 },
-  'instagram-reel': { maxEdge: 1920, quality: 0.94 },
-  tiktok: { maxEdge: 1920, quality: 0.94 },
+  whatsapp: { maxEdge: 1280, quality: 0.92 },
+  'instagram-reel': { maxEdge: 1920, quality: 0.95 },
+  tiktok: { maxEdge: 1920, quality: 0.95 },
   'max-quality': { maxEdge: 9999, quality: 0.98 },
 }
 
@@ -518,7 +518,7 @@ function App() {
         // PNG → WebP for real compression; otherwise preserve JPEG/WebP, fallback to JPEG
         const outputMime = isPng ? 'image/webp'
           : ['image/jpeg', 'image/webp'].includes(originalMime) ? originalMime : 'image/jpeg'
-        const quality = isPng ? 0.92 : imagePreset.quality
+        const quality = isPng ? 0.95 : imagePreset.quality
         const blob = await canvasToBlob(canvas, outputMime, quality)
         const ext = outputMime === 'image/jpeg' ? 'jpg' : outputMime === 'image/webp' ? 'webp' : 'png'
 
