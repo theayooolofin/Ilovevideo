@@ -1,5 +1,5 @@
 import posthog from 'posthog-js'
-posthog.init('phc_3QEpSIC6Xfx6NPX2JlKJhqRGFjP0yRK0VM9VnMSvY7q', { api_host: 'https://app.posthog.com' })
+posthog.init(import.meta.env.VITE_POSTHOG_KEY, { api_host: 'https://app.posthog.com' })
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
