@@ -265,15 +265,18 @@ function App() {
   }
 
   const postStats = async (type, mbSaved) => {
+    console.log('DEBUG postStats called', { type, mbSaved })
     try {
       const headers = await getAuthHeaders()
       headers['Content-Type'] = 'application/json'
       await fetch(`${API_URL}/api/stats`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ type, mb_saved: Math.max(0, mbSaved) }),
+        body: JSON.stringify({ type, mb_saved: mbSaved }),
       })
-    } catch {}
+    } catch (error) {
+      console.error('DEBUG postStats error', error)
+    }
   }
 
   const fetchPricing = async () => {
