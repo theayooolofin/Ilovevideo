@@ -1015,18 +1015,31 @@ button, a, input, select, textarea, label {
   margin: 0 0 12px;
 }
 
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  width: 100%;
+}
+
 .download-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 9px 18px;
+  width: 100%;
+  padding: 11px 18px;
+  border: none;
   border-radius: var(--r-md);
   background: var(--grad-brand);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   text-decoration: none;
+  cursor: pointer;
   box-shadow: 0 3px 10px rgba(79,70,229,0.3);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .download-btn:hover {
@@ -1038,6 +1051,42 @@ button, a, input, select, textarea, label {
 .download-btn svg {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
+}
+
+.wa-share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 18px;
+  border: none;
+  border-radius: var(--r-md);
+  background: #25D366;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.wa-share-btn:hover {
+  background: #1daf57;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .output-card {
+    flex-direction: column;
+  }
+  .output-icon {
+    align-self: flex-start;
+  }
+  .wa-share-btn {
+    font-size: 16px;
+    padding: 15px 18px;
+  }
 }
 
 /* ─────────────────────────────────────────

@@ -1308,14 +1308,15 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <button type="button" onClick={handleDownload} className="download-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          Download File
-                        </button>
-                        <button type="button" onClick={handleWhatsAppShare}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '14px 20px', marginTop: '8px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}>
-                          📱 Share on WhatsApp
-                        </button>
+                        <div className="result-actions">
+                          <button type="button" onClick={handleDownload} className="download-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Download File
+                          </button>
+                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                            📱 Share on WhatsApp
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1495,14 +1496,15 @@ function App() {
                           {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <button type="button" onClick={handleDownload} className="download-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          Download File
-                        </button>
-                        <button type="button" onClick={handleWhatsAppShare}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '14px 20px', marginTop: '8px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}>
-                          📱 Share on WhatsApp
-                        </button>
+                        <div className="result-actions">
+                          <button type="button" onClick={handleDownload} className="download-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Download File
+                          </button>
+                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                            📱 Share on WhatsApp
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1621,14 +1623,15 @@ function App() {
                           {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
                           {result.summary && ` · ${result.summary}`}
                         </p>
-                        <button type="button" onClick={handleDownload} className="download-btn">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                          Download MP4
-                        </button>
-                        <button type="button" onClick={handleWhatsAppShare}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '14px 20px', marginTop: '8px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}>
-                          📱 Share on WhatsApp
-                        </button>
+                        <div className="result-actions">
+                          <button type="button" onClick={handleDownload} className="download-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Download MP4
+                          </button>
+                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                            📱 Share on WhatsApp
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1722,8 +1725,7 @@ function App() {
               <a href="#how-it-works" className="footer-link">How it Works</a>
               <a href="#" className="footer-link">Privacy Policy</a>
               <a href="#" className="footer-link">Contact</a>
-              <button type="button" onClick={handleWhatsAppShare}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '9px 14px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', width: 'fit-content' }}>
+              <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn" style={{ marginTop: '8px', width: 'fit-content', padding: '9px 14px', fontSize: '13px' }}>
                 📱 Share iLoveVideo on WhatsApp →
               </button>
             </div>
