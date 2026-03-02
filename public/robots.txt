@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ilovevideo.fun/sitemap.xml
