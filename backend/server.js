@@ -149,19 +149,19 @@ const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
     '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
-    '-vf', "scale='min(1280,iw)':-2",
+    '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
     '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
-    '-vf', "scale='min(1920,iw)':-2",
+    '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
     '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
-    '-vf', "scale='min(1920,iw)':-2",
+    '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-threads', '0',
   ],
