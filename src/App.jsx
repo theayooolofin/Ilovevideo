@@ -374,42 +374,37 @@ function App() {
       const res = await fetch(`${API_URL}/api/create-payment`, { method: 'POST', headers })
       if (!res.ok) throw new Error('Payment setup failed')
       const config = await res.json()
+      console.log('Paystack config received:', { public_key: config.public_key?.slice(0, 10) + '...', amount: config.amount, currency: config.currency })
       if (!config.public_key || !config.reference || !config.amount) {
-        throw new Error('Invalid Paystack config')
+        throw new Error('Invalid Paystack config: missing required fields')
       }
-      if (typeof PaystackPop === 'undefined') {
-        throw new Error('Paystack script not loaded')
+      if (typeof window.PaystackPop === 'undefined') {
+        throw new Error('Paystack script not loaded — check network/CSP')
       }
       posthog.capture('checkout_started')
-      const handler = PaystackPop.setup({
+      console.log('Opening Paystack popup...')
+      const handler = window.PaystackPop.setup({
         key: config.public_key,
         email: config.email || user?.email,
         amount: config.amount,
         currency: config.currency || 'NGN',
         ref: config.reference,
-        callback: async (response) => {
+        callback: (response) => {
+          console.log('Paystack callback:', response)
           if (response.status === 'success' && response.reference) {
-            console.log('Paystack success:', response.reference)
             setShowLimitModal(false)
             posthog.capture('pro_purchased', { payment_ref: response.reference })
-            await fetchUsage()
+            fetchUsage()
           }
         },
         onClose: () => {
           console.log('Paystack popup closed')
         },
-        metadata: {
-          custom_fields: [{ display_name: 'Pro Plan', variable_name: 'plan', value: 'unlimited' }]
-        }
       })
-      try {
-        handler.openIframe()
-      } catch (error) {
-        console.error('Paystack popup error:', error)
-        throw new Error('Paystack popup failed to open')
-      }
-    } catch {
-      setErrorMessage('Payment setup failed. Please try again.')
+      handler.openIframe()
+    } catch (err) {
+      console.error('handleGoPro error:', err)
+      setErrorMessage(`Payment setup failed: ${err.message}`)
     }
   }
 
