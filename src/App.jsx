@@ -15,19 +15,11 @@ const USER_LIMIT = 10
 const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
   { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true },
+  { id: 'resize', name: 'Resize for Social', description: 'Resize videos and images for social formats.', available: true },
+  { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true },
+  { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
+  { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: false },
-  {
-    id: 'remove-audio',
-    name: 'Remove Audio',
-    description: 'Create silent versions.',
-    available: false,
-  },
-  {
-    id: 'resize',
-    name: 'Resize for Reels/TikTok/WhatsApp',
-    description: 'Resize videos and images for social formats.',
-    available: true,
-  },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -195,6 +187,42 @@ function App() {
   const [accountInfo, setAccountInfo] = useState(null)
   const [page, setPage] = useState(() => window.location.pathname === '/pro' ? 'pro' : 'home')
 
+  // Bulk compression
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkFiles, setBulkFiles] = useState([])
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  // Extract audio
+  const [audioFile, setAudioFile] = useState(null)
+  const [audioProcessing, setAudioProcessing] = useState(false)
+  const [audioResult, setAudioResult] = useState(null)
+  const [audioError, setAudioError] = useState('')
+
+  // GIF maker
+  const [gifFile, setGifFile] = useState(null)
+  const [gifProcessing, setGifProcessing] = useState(false)
+  const [gifResult, setGifResult] = useState(null)
+  const [gifError, setGifError] = useState('')
+  const [gifStartTime, setGifStartTime] = useState(0)
+  const [gifDuration, setGifDuration] = useState(5)
+  const [gifScale, setGifScale] = useState(480)
+  const [gifVideoDuration, setGifVideoDuration] = useState(60)
+
+  // Watermark
+  const [watermarkVideoFile, setWatermarkVideoFile] = useState(null)
+  const [watermarkLogoFile, setWatermarkLogoFile] = useState(null)
+  const [watermarkPosition, setWatermarkPosition] = useState('bottom-right')
+  const [watermarkProcessing, setWatermarkProcessing] = useState(false)
+  const [watermarkResult, setWatermarkResult] = useState(null)
+  const [watermarkError, setWatermarkError] = useState('')
+
+  // Advanced compress settings
+  const [advancedMode, setAdvancedMode] = useState(false)
+  const [advancedFps, setAdvancedFps] = useState('')
+  const [advancedResolution, setAdvancedResolution] = useState('')
+  const [advancedFormat, setAdvancedFormat] = useState('mp4')
+  const [advancedRemoveAudio, setAdvancedRemoveAudio] = useState(false)
+
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
     [compressionPresetId],
@@ -222,6 +250,20 @@ function App() {
     if (selectedTool === 'convert') return 'video/quicktime,video/x-matroska,video/x-msvideo,video/webm,.mov,.mkv,.avi,.webm'
     return 'video/*,image/*'
   }, [selectedTool, resizeMediaType, compressMediaType])
+
+  // Detect GIF video duration when file changes
+  useEffect(() => {
+    if (!gifFile) return
+    const videoEl = document.createElement('video')
+    const url = URL.createObjectURL(gifFile)
+    videoEl.src = url
+    videoEl.onloadedmetadata = () => {
+      setGifVideoDuration(Math.max(1, Math.floor(videoEl.duration)) || 60)
+      setGifStartTime(0)
+      URL.revokeObjectURL(url)
+    }
+    videoEl.onerror = () => { setGifVideoDuration(60); URL.revokeObjectURL(url) }
+  }, [gifFile])
 
   const clearResult = () => {
     setResult((previous) => {
@@ -622,6 +664,14 @@ function App() {
       formData.append('video', selectedFile)
       formData.append('preset', apiPreset)
 
+      // Advanced settings (Pro only)
+      if (hasProAccess && advancedMode) {
+        if (advancedFps) formData.append('fps', advancedFps)
+        if (advancedResolution) formData.append('resolution', advancedResolution)
+        if (advancedFormat) formData.append('format', advancedFormat)
+        if (advancedRemoveAudio) formData.append('removeAudio', 'true')
+      }
+
       const compressHeaders = await getAuthHeaders()
       const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors', headers: compressHeaders })
       if (!response.ok) {
@@ -636,9 +686,10 @@ function App() {
       const blob = await response.blob()
       const downloadUrl = URL.createObjectURL(blob)
 
+      const outputFormat = (hasProAccess && advancedMode && advancedFormat) ? advancedFormat : 'mp4'
       setResult({
         url: downloadUrl,
-        fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.mp4`,
+        fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.${outputFormat}`,
         sizeBytes: compressedSize,
         summary: `Preset: ${compressionPreset.label}${savings !== '0' ? ` · ${savings}% smaller` : ''}`,
       })
@@ -848,6 +899,120 @@ function App() {
     }
   }
 
+  const handleBulkCompress = async () => {
+    if (bulkFiles.length === 0) return
+    setBulkProcessing(true)
+    for (let i = 0; i < bulkFiles.length; i++) {
+      if (bulkFiles[i].status !== 'pending') continue
+      setBulkFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'processing' } : f))
+      try {
+        const presetMap = { 'instagram-reel': 'instagram', 'max-quality': 'max-quality' }
+        const apiPreset = presetMap[compressionPresetId] ?? compressionPresetId
+        const formData = new FormData()
+        formData.append('video', bulkFiles[i].file)
+        formData.append('preset', apiPreset)
+        const headers = await getAuthHeaders()
+        const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors', headers })
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || `Server error ${response.status}`)
+        }
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const fileName = `${baseName(bulkFiles[i].file.name)}-compressed.mp4`
+        setBulkFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'done', result: { url, fileName } } : f))
+      } catch (err) {
+        setBulkFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error', error: err.message } : f))
+      }
+    }
+    setBulkProcessing(false)
+    fetchUsage()
+  }
+
+  const handleExtractAudio = async () => {
+    if (!audioFile) { setAudioError('Please select a video file first.'); return }
+    setAudioError('')
+    setAudioResult(null)
+    setAudioProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', audioFile)
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/extract-audio`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setAudioResult({ url, fileName: `${baseName(audioFile.name)}-audio.mp3` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setAudioError(toErrorMessage(err, 'Audio extraction failed.'))
+    } finally {
+      setAudioProcessing(false)
+    }
+  }
+
+  const handleMakeGif = async () => {
+    if (!gifFile) { setGifError('Please select a video file first.'); return }
+    setGifError('')
+    setGifResult(null)
+    setGifProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', gifFile)
+      formData.append('startTime', gifStartTime.toString())
+      formData.append('duration', gifDuration.toString())
+      formData.append('scale', gifScale.toString())
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/make-gif`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setGifResult({ url, fileName: `${baseName(gifFile.name)}-clip.gif` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setGifError(toErrorMessage(err, 'GIF creation failed.'))
+    } finally {
+      setGifProcessing(false)
+    }
+  }
+
+  const handleWatermark = async () => {
+    if (!watermarkVideoFile) { setWatermarkError('Please select a video file.'); return }
+    if (!watermarkLogoFile) { setWatermarkError('Please select a logo image.'); return }
+    setWatermarkError('')
+    setWatermarkResult(null)
+    setWatermarkProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', watermarkVideoFile)
+      formData.append('logo', watermarkLogoFile)
+      formData.append('position', watermarkPosition)
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/watermark`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setWatermarkResult({ url, fileName: `${baseName(watermarkVideoFile.name)}-watermarked.mp4` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setWatermarkError(toErrorMessage(err, 'Watermark failed.'))
+    } finally {
+      setWatermarkProcessing(false)
+    }
+  }
+
   const handleDownload = async () => {
     if (!result) return
     try {
@@ -899,7 +1064,10 @@ function App() {
   const isCompressTool = selectedTool === 'compress'
   const isResizeTool = selectedTool === 'resize'
   const isConvertTool = selectedTool === 'convert'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool
+  const isExtractAudioTool = selectedTool === 'extract-audio'
+  const isGifTool = selectedTool === 'gif'
+  const isWatermarkTool = selectedTool === 'watermark'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -1220,16 +1388,28 @@ function App() {
           {TOOL_CARDS.map((tool) => {
             const isActive = selectedTool === tool.id
             const isSoon = !tool.available
+            const isProTool = tool.pro
+            const isLocked = isProTool && !hasProAccess
             return (
               <button
                 key={tool.id}
                 type="button"
-                onClick={() => { if (!isSoon) setSelectedTool(tool.id) }}
+                onClick={() => {
+                  if (isSoon) return
+                  if (isLocked) {
+                    if (user) setShowLimitModal(true)
+                    else { setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }
+                    return
+                  }
+                  setSelectedTool(tool.id)
+                }}
                 disabled={isSoon}
                 className={`pill-tab${isActive ? ' active' : ''}${isSoon ? ' soon' : ''}`}
               >
+                {isLocked && <span style={{ marginRight: '4px', fontSize: '11px' }}>🔒</span>}
                 {tool.name}
                 {isSoon && <span className="soon-badge">Soon</span>}
+                {isProTool && !isSoon && <span style={{ marginLeft: '5px', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '999px', verticalAlign: 'middle', letterSpacing: '0.02em' }}>PRO</span>}
               </button>
             )
           })}
@@ -1282,7 +1462,75 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Upload Zone */}
+                  {/* Bulk Mode Toggle (Pro + video only) */}
+                  {hasProAccess && compressMediaType === 'video' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setBulkMode(m => !m); setBulkFiles([]); setSelectedFile(null); clearResult() }}
+                        style={{ fontSize: '13px', fontWeight: '600', padding: '5px 12px', borderRadius: '8px', border: '1.5px solid', borderColor: bulkMode ? '#2563eb' : '#e5e7eb', background: bulkMode ? '#eff6ff' : '#fff', color: bulkMode ? '#2563eb' : '#6b7280', cursor: 'pointer' }}
+                      >
+                        {bulkMode ? '✓ Bulk Mode On' : 'Bulk Mode'}
+                      </button>
+                      {bulkMode && <span style={{ fontSize: '12px', color: '#6b7280' }}>Compress multiple files at once</span>}
+                    </div>
+                  )}
+
+                  {/* Bulk Upload Zone */}
+                  {bulkMode ? (
+                    <div>
+                      <span className="field-label">Upload Files</span>
+                      <label
+                        htmlFor="bulk-input"
+                        className={`upload-zone${bulkFiles.length > 0 ? ' has-file' : ''}`}
+                        onDragEnter={(e) => { e.preventDefault(); setIsDropActive(true) }}
+                        onDragOver={(e) => { e.preventDefault(); setIsDropActive(true) }}
+                        onDragLeave={(e) => { e.preventDefault(); setIsDropActive(false) }}
+                        onDrop={(e) => {
+                          e.preventDefault(); setIsDropActive(false)
+                          const files = Array.from(e.dataTransfer?.files || []).filter(isVideoFile)
+                          if (files.length) setBulkFiles(files.map(f => ({ file: f, status: 'pending', result: null, error: null })))
+                        }}
+                      >
+                        <input
+                          id="bulk-input" type="file" accept="video/*" multiple className="sr-only"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []).filter(isVideoFile)
+                            if (files.length) setBulkFiles(files.map(f => ({ file: f, status: 'pending', result: null, error: null })))
+                            e.target.value = ''
+                          }}
+                        />
+                        <div className="upload-icon-box">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                        {bulkFiles.length > 0 ? (
+                          <p className="upload-title" style={{ color: '#065f46' }}>{bulkFiles.length} file{bulkFiles.length !== 1 ? 's' : ''} selected</p>
+                        ) : (
+                          <>
+                            <p className="upload-title"><span className="upload-title-desktop">Drop multiple videos here</span><span className="upload-title-mobile">Tap to select videos</span></p>
+                            <p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p>
+                          </>
+                        )}
+                      </label>
+                      {bulkFiles.length > 0 && (
+                        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {bulkFiles.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '8px', background: item.status === 'done' ? '#f0fdf4' : item.status === 'error' ? '#fef2f2' : '#f9fafb', border: '1px solid', borderColor: item.status === 'done' ? '#bbf7d0' : item.status === 'error' ? '#fecaca' : '#e5e7eb' }}>
+                              <span style={{ fontSize: '13px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#374151' }}>{item.file.name}</span>
+                              <span style={{ fontSize: '12px', fontWeight: '600', color: item.status === 'done' ? '#059669' : item.status === 'error' ? '#dc2626' : item.status === 'processing' ? '#2563eb' : '#9ca3af', flexShrink: 0 }}>
+                                {item.status === 'done' ? '✓ Done' : item.status === 'error' ? '✗ Failed' : item.status === 'processing' ? 'Processing...' : 'Pending'}
+                              </span>
+                              {item.status === 'done' && item.result && (
+                                <a href={item.result.url} download={item.result.fileName} style={{ fontSize: '12px', fontWeight: '600', color: '#2563eb', textDecoration: 'none', flexShrink: 0 }}>Download</a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
                   <div>
                     <span className="field-label">Upload File</span>
                     <label
@@ -1331,6 +1579,7 @@ function App() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Platform Presets */}
                   <div>
@@ -1361,7 +1610,70 @@ function App() {
                     </div>
                   </div>
 
+                  {/* Advanced Settings (Pro + video only) */}
+                  {hasProAccess && compressMediaType === 'video' && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setAdvancedMode(m => !m)}
+                        style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <span>Advanced Settings</span>
+                        <span style={{ fontSize: '10px', transition: 'transform 0.15s', display: 'inline-block', transform: advancedMode ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+                      </button>
+                      {advancedMode && (
+                        <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>FPS</label>
+                            <select value={advancedFps} onChange={e => setAdvancedFps(e.target.value)} className="custom-select">
+                              <option value="">Keep original</option>
+                              <option value="24">24 fps</option>
+                              <option value="30">30 fps</option>
+                              <option value="60">60 fps</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Resolution</label>
+                            <select value={advancedResolution} onChange={e => setAdvancedResolution(e.target.value)} className="custom-select">
+                              <option value="">Keep original</option>
+                              <option value="1080">1080p</option>
+                              <option value="720">720p</option>
+                              <option value="480">480p</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Format</label>
+                            <select value={advancedFormat} onChange={e => setAdvancedFormat(e.target.value)} className="custom-select">
+                              <option value="mp4">MP4</option>
+                              <option value="mkv">MKV</option>
+                              <option value="mov">MOV</option>
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+                            <input
+                              id="remove-audio" type="checkbox" checked={advancedRemoveAudio}
+                              onChange={e => setAdvancedRemoveAudio(e.target.checked)}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <label htmlFor="remove-audio" style={{ fontSize: '13px', fontWeight: '500', color: '#374151', cursor: 'pointer' }}>Remove Audio</label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Action Button */}
+                  {bulkMode ? (
+                    <button
+                      type="button"
+                      onClick={handleBulkCompress}
+                      disabled={bulkFiles.length === 0 || bulkProcessing}
+                      className="action-btn"
+                    >
+                      {bulkProcessing && <span className="action-spinner" />}
+                      {bulkProcessing ? 'Compressing...' : `Compress All (${bulkFiles.length} file${bulkFiles.length !== 1 ? 's' : ''})`}
+                    </button>
+                  ) : (
                   <button
                     type="button"
                     onClick={handleCompress}
@@ -1373,6 +1685,7 @@ function App() {
                     )}
                     {compressButtonState.text}
                   </button>
+                  )}
                   <p className="status-line">{statusMessage}</p>
 
                   {isCompressTool && compressMediaType === 'video' && usageCount > 0 && !isProcessing && !hasProAccess && (
@@ -1740,6 +2053,286 @@ function App() {
                         <p className="output-meta">{errorMessage}</p>
                       </div>
                     </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Extract Audio Panel ── */}
+              {isExtractAudioTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Extract Audio</p>
+                      <p className="panel-desc">Pull the MP3 audio track from any video.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to extract audio from videos.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="audio-input" className={`upload-zone${audioFile ? ' has-file' : ''}`}>
+                          <input id="audio-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setAudioFile(f); setAudioResult(null); setAudioError('') }; e.target.value = '' }} />
+                          <div className="upload-icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {audioFile ? (
+                            <><p className="upload-title" style={{ color: '#065f46' }}>{audioFile.name}</p><p className="upload-hint">{formatBytes(audioFile.size)} · Click to change</p></>
+                          ) : (
+                            <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p></>
+                          )}
+                        </label>
+                      </div>
+                      <button type="button" onClick={handleExtractAudio} disabled={!audioFile || audioProcessing} className="action-btn">
+                        {audioProcessing && <span className="action-spinner" />}
+                        {audioProcessing ? 'Extracting...' : 'Extract Audio →'}
+                      </button>
+                      {audioProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open during extraction
+                        </div>
+                      )}
+                      {audioResult && (
+                        <div className="output-card success">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body">
+                            <p className="output-title">MP3 Ready</p>
+                            <p className="output-meta">Audio extracted successfully</p>
+                            <div className="result-actions">
+                              <a href={audioResult.url} download={audioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Download MP3
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {audioError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{audioError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── GIF Maker Panel ── */}
+              {isGifTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="13" r="3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">GIF Maker</p>
+                      <p className="panel-desc">Convert a video clip into an animated GIF.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to create GIFs from videos.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="gif-input" className={`upload-zone${gifFile ? ' has-file' : ''}`}>
+                          <input id="gif-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setGifFile(f); setGifResult(null); setGifError('') }; e.target.value = '' }} />
+                          <div className="upload-icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {gifFile ? (
+                            <><p className="upload-title" style={{ color: '#065f46' }}>{gifFile.name}</p><p className="upload-hint">{formatBytes(gifFile.size)} · Click to change</p></>
+                          ) : (
+                            <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p></>
+                          )}
+                        </label>
+                      </div>
+                      {gifFile && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Start Time: {gifStartTime}s</label>
+                            <input type="range" min="0" max={Math.max(0, gifVideoDuration - 1)} step="1" value={gifStartTime}
+                              onChange={e => { const v = parseInt(e.target.value); setGifStartTime(v); if (v + gifDuration > gifVideoDuration) setGifDuration(Math.max(1, gifVideoDuration - v)) }}
+                              style={{ width: '100%' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Duration: {gifDuration}s</label>
+                            <input type="range" min="1" max={Math.min(10, gifVideoDuration)} step="1" value={gifDuration}
+                              onChange={e => setGifDuration(parseInt(e.target.value))}
+                              style={{ width: '100%' }} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Width</label>
+                            <select value={gifScale} onChange={e => setGifScale(parseInt(e.target.value))} className="custom-select">
+                              <option value={320}>320px (small)</option>
+                              <option value={480}>480px (medium)</option>
+                              <option value={640}>640px (large)</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                      {gifFile && (
+                        <p style={{ fontSize: '13px', color: '#6b7280', margin: '0' }}>
+                          {gifDuration}s clip starting at {gifStartTime}s → ~{gifScale}px wide GIF (15 fps)
+                        </p>
+                      )}
+                      <button type="button" onClick={handleMakeGif} disabled={!gifFile || gifProcessing} className="action-btn">
+                        {gifProcessing && <span className="action-spinner" />}
+                        {gifProcessing ? 'Creating GIF...' : 'Create GIF →'}
+                      </button>
+                      {gifProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open during processing
+                        </div>
+                      )}
+                      {gifResult && (
+                        <div className="output-card success">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body">
+                            <p className="output-title">GIF Ready</p>
+                            <p className="output-meta">{gifDuration}s · {gifScale}px wide · 15fps</p>
+                            <div className="result-actions">
+                              <a href={gifResult.url} download={gifResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Download GIF
+                              </a>
+                            </div>
+                            <div style={{ marginTop: '12px' }}><img src={gifResult.url} alt="GIF preview" style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid #e5e7eb' }} /></div>
+                          </div>
+                        </div>
+                      )}
+                      {gifError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{gifError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── Watermark Panel ── */}
+              {isWatermarkTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Watermark Video</p>
+                      <p className="panel-desc">Overlay your logo onto any video.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to add watermarks to your videos.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+                        <div>
+                          <span className="field-label">Upload Video</span>
+                          <label htmlFor="wm-video-input" className={`upload-zone${watermarkVideoFile ? ' has-file' : ''}`} style={{ minHeight: '100px' }}>
+                            <input id="wm-video-input" type="file" accept="video/*" className="sr-only"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) { setWatermarkVideoFile(f); setWatermarkResult(null); setWatermarkError('') }; e.target.value = '' }} />
+                            {watermarkVideoFile ? (
+                              <p className="upload-title" style={{ color: '#065f46', fontSize: '12px' }}>{watermarkVideoFile.name}</p>
+                            ) : (
+                              <p className="upload-title" style={{ fontSize: '12px' }}>Drop video or click</p>
+                            )}
+                          </label>
+                        </div>
+                        <div>
+                          <span className="field-label">Upload Logo (PNG/JPG)</span>
+                          <label htmlFor="wm-logo-input" className={`upload-zone${watermarkLogoFile ? ' has-file' : ''}`} style={{ minHeight: '100px' }}>
+                            <input id="wm-logo-input" type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) { setWatermarkLogoFile(f); setWatermarkResult(null); setWatermarkError('') }; e.target.value = '' }} />
+                            {watermarkLogoFile ? (
+                              <p className="upload-title" style={{ color: '#065f46', fontSize: '12px' }}>{watermarkLogoFile.name}</p>
+                            ) : (
+                              <p className="upload-title" style={{ fontSize: '12px' }}>Drop logo or click</p>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="field-label">Logo Position</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '240px' }}>
+                          {[['top-left', '↖ Top Left'], ['top-right', '↗ Top Right'], ['bottom-left', '↙ Bottom Left'], ['bottom-right', '↘ Bottom Right']].map(([pos, label]) => (
+                            <button key={pos} type="button"
+                              onClick={() => setWatermarkPosition(pos)}
+                              style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid', borderColor: watermarkPosition === pos ? '#2563eb' : '#e5e7eb', background: watermarkPosition === pos ? '#eff6ff' : '#fff', color: watermarkPosition === pos ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleWatermark} disabled={!watermarkVideoFile || !watermarkLogoFile || watermarkProcessing} className="action-btn">
+                        {watermarkProcessing && <span className="action-spinner" />}
+                        {watermarkProcessing ? 'Applying Watermark...' : 'Apply Watermark →'}
+                      </button>
+                      {watermarkProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open during processing
+                        </div>
+                      )}
+                      {watermarkResult && (
+                        <div className="output-card success">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body">
+                            <p className="output-title">Watermarked Video Ready</p>
+                            <p className="output-meta">Logo positioned: {watermarkPosition.replace('-', ' ')}</p>
+                            <div className="result-actions">
+                              <a href={watermarkResult.url} download={watermarkResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Download Video
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {watermarkError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{watermarkError}</p></div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

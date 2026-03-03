@@ -211,6 +211,7 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
 
     const originalSize = fs.statSync(inputPath).size;
     const outputSize = fs.statSync(outputPath).size;
+    const contentType = opts.contentType || 'video/mp4';
 
     console.log(`Compression result: Input ${originalSize} vs Output ${outputSize}`);
 
@@ -218,7 +219,7 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     if (opts.sizeGuard && outputSize >= originalSize) {
       console.log('Output is larger. Keeping original file to preserve quality.');
       fs.unlink(outputPath, () => {});
-      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Content-Type', contentType);
       res.setHeader('X-Original-Size', originalSize.toString());
       res.setHeader('X-Compressed-Size', originalSize.toString());
       res.setHeader('X-Savings-Percent', '0');
@@ -234,7 +235,7 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
 
     const savingsPercent = Math.max(0, Math.round(((originalSize - outputSize) / originalSize) * 100));
 
-    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Type', contentType);
     res.setHeader('X-Original-Size', originalSize.toString());
     res.setHeader('X-Compressed-Size', outputSize.toString());
     res.setHeader('X-Savings-Percent', savingsPercent.toString());
@@ -264,6 +265,56 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     }
   });
 };
+
+// ── Simple FFmpeg runner for Pro-only endpoints ──────────────────────────────
+const runProFFmpeg = (args, cleanupFn, res, req, contentType, filename) => {
+  const ffmpeg = spawn('ffmpeg', args);
+  let stderr = '';
+  ffmpeg.stderr.on('data', (d) => { stderr += d.toString(); });
+
+  ffmpeg.on('close', (code) => {
+    const outputPath = args[args.length - 1];
+    if (code !== 0 || !fs.existsSync(outputPath)) {
+      cleanupFn();
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: code !== 0 ? 'Processing failed' : 'Output file not created',
+          details: stderr.slice(-400),
+        });
+      }
+      return;
+    }
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    const stream = fs.createReadStream(outputPath);
+    stream.pipe(res);
+    stream.on('end', cleanupFn);
+    stream.on('error', cleanupFn);
+  });
+
+  ffmpeg.on('error', (err) => {
+    cleanupFn();
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  });
+
+  req.on('close', () => {
+    if (!res.headersSent) { ffmpeg.kill('SIGTERM'); cleanupFn(); }
+  });
+};
+
+// ── Watermark multer (accepts video + image logo) ────────────────────────────
+const watermarkUpload = multer({
+  storage,
+  limits: { fileSize: 500 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const videoExts = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.3gp'];
+    const imageExts = ['.jpg', '.jpeg', '.png', '.webp'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.fieldname === 'video' && videoExts.includes(ext)) return cb(null, true);
+    if (file.fieldname === 'logo' && imageExts.includes(ext)) return cb(null, true);
+    cb(new Error('Invalid file type'));
+  },
+});
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -305,14 +356,47 @@ app.post('/api/compress', upload.single('video'), async (req, res) => {
   incrementUsageForKey(key);
 
   const preset = req.body.preset || 'whatsapp';
-  const presetArgs = COMPRESS_PRESETS[preset] || COMPRESS_PRESETS.whatsapp;
   const inputPath = req.file.path;
+
+  // Advanced settings — only applied for Pro users
+  const fps = isPro && req.body.fps ? parseInt(req.body.fps) : null;
+  const resolution = isPro && req.body.resolution ? parseInt(req.body.resolution) : null;
+  const format = isPro && ['mp4', 'mkv', 'mov'].includes(req.body.format) ? req.body.format : 'mp4';
+  const removeAudio = isPro && req.body.removeAudio === 'true';
+
   const outputPath = path.join(OUTPUT_DIR,
-    `compressed-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+    `compressed-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${format}`);
 
-  res.setHeader('Content-Disposition', 'attachment; filename="ilovevideo-compressed.mp4"');
+  const contentTypeMap = { mp4: 'video/mp4', mkv: 'video/x-matroska', mov: 'video/quicktime' };
+  const contentType = contentTypeMap[format] || 'video/mp4';
+  res.setHeader('Content-Disposition', `attachment; filename="ilovevideo-compressed.${format}"`);
 
-  runFFmpeg(['-i', inputPath, ...presetArgs, outputPath], inputPath, outputPath, res, req, { sizeGuard: true });
+  // Build FFmpeg args from preset with optional overrides
+  const baseArgs = [...(COMPRESS_PRESETS[preset] || COMPRESS_PRESETS.whatsapp)];
+
+  if (fps) baseArgs.push('-r', fps.toString());
+
+  if (resolution) {
+    const vfIdx = baseArgs.indexOf('-vf');
+    if (vfIdx !== -1) baseArgs.splice(vfIdx, 2, '-vf', `scale=-2:${resolution}`);
+    else baseArgs.push('-vf', `scale=-2:${resolution}`);
+  }
+
+  if (removeAudio) {
+    const caIdx = baseArgs.indexOf('-c:a');
+    if (caIdx !== -1) baseArgs.splice(caIdx, 2);
+    const baIdx = baseArgs.indexOf('-b:a');
+    if (baIdx !== -1) baseArgs.splice(baIdx, 2);
+    baseArgs.push('-an');
+  }
+
+  // MKV doesn't support -movflags +faststart
+  if (format === 'mkv') {
+    const mfIdx = baseArgs.indexOf('-movflags');
+    if (mfIdx !== -1) baseArgs.splice(mfIdx, 2);
+  }
+
+  runFFmpeg(['-i', inputPath, ...baseArgs, outputPath], inputPath, outputPath, res, req, { sizeGuard: true, contentType });
 });
 
 app.post('/api/resize', upload.single('video'), async (req, res) => {
@@ -685,6 +769,109 @@ app.post('/api/send-welcome', async (req, res) => {
     res.status(500).json({ error: 'Failed to send welcome email' });
   }
 });
+
+// ── Pro: Extract Audio ───────────────────────────────────────────────────────
+app.post('/api/extract-audio', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `audio-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp3`);
+
+  const cleanup = () => {
+    if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
+    if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+  };
+
+  runProFFmpeg(
+    ['-i', inputPath, '-q:a', '0', '-map', 'a', outputPath],
+    cleanup, res, req, 'audio/mpeg', 'ilovevideo-audio.mp3'
+  );
+});
+
+// ── Pro: GIF Maker ────────────────────────────────────────────────────────────
+app.post('/api/make-gif', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const startTime = parseFloat(req.body.startTime) || 0;
+  const duration = Math.min(parseFloat(req.body.duration) || 5, 10);
+  const scale = parseInt(req.body.scale) || 480;
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `gif-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.gif`);
+
+  const cleanup = () => {
+    if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
+    if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+  };
+
+  const vf = `fps=15,scale=${scale}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+  runProFFmpeg(
+    ['-ss', startTime.toString(), '-t', duration.toString(), '-i', inputPath, '-vf', vf, outputPath],
+    cleanup, res, req, 'image/gif', 'ilovevideo-clip.gif'
+  );
+});
+
+// ── Pro: Watermark Video ─────────────────────────────────────────────────────
+app.post('/api/watermark',
+  watermarkUpload.fields([{ name: 'video', maxCount: 1 }, { name: 'logo', maxCount: 1 }]),
+  async (req, res) => {
+    const videoFile = req.files?.video?.[0];
+    const logoFile = req.files?.logo?.[0];
+
+    if (!videoFile) return res.status(400).json({ error: 'No video file uploaded' });
+    if (!logoFile) {
+      if (videoFile) fs.unlink(videoFile.path, () => {});
+      return res.status(400).json({ error: 'No logo file uploaded' });
+    }
+
+    const { isPro } = await resolveKeyAndLimit(req);
+    if (!isPro) {
+      fs.unlink(videoFile.path, () => {});
+      fs.unlink(logoFile.path, () => {});
+      return res.status(403).json({ error: 'PRO_REQUIRED' });
+    }
+
+    const position = req.body.position || 'bottom-right';
+    const overlayMap = {
+      'top-left': 'overlay=10:10',
+      'top-right': 'overlay=W-w-10:10',
+      'bottom-left': 'overlay=10:H-h-10',
+      'bottom-right': 'overlay=W-w-10:H-h-10',
+    };
+    const overlay = overlayMap[position] || overlayMap['bottom-right'];
+
+    const videoPath = videoFile.path;
+    const logoPath = logoFile.path;
+    const outputPath = path.join(OUTPUT_DIR,
+      `watermark-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+    const cleanup = () => {
+      if (fs.existsSync(videoPath)) fs.unlink(videoPath, () => {});
+      if (fs.existsSync(logoPath)) fs.unlink(logoPath, () => {});
+      if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+    };
+
+    runProFFmpeg(
+      ['-i', videoPath, '-i', logoPath, '-filter_complex', overlay,
+       '-c:a', 'copy', '-movflags', '+faststart', outputPath],
+      cleanup, res, req, 'video/mp4', 'ilovevideo-watermarked.mp4'
+    );
+  }
+);
 
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
