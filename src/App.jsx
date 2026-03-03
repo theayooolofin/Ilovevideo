@@ -20,7 +20,7 @@ const TOOL_CARDS = [
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
-  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: true, pro: true },
+  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
 ]
 
 const COMPRESSION_PRESETS = [
