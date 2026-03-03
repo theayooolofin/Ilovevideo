@@ -19,7 +19,7 @@ const TOOL_CARDS = [
   { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true },
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
-  { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: false },
+  { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -216,6 +216,15 @@ function App() {
   const [watermarkResult, setWatermarkResult] = useState(null)
   const [watermarkError, setWatermarkError] = useState('')
 
+  // Trim video
+  const [trimFile, setTrimFile] = useState(null)
+  const [trimProcessing, setTrimProcessing] = useState(false)
+  const [trimResult, setTrimResult] = useState(null)
+  const [trimError, setTrimError] = useState('')
+  const [trimStartTime, setTrimStartTime] = useState(0)
+  const [trimEndTime, setTrimEndTime] = useState(10)
+  const [trimVideoDuration, setTrimVideoDuration] = useState(60)
+
   // Advanced compress settings
   const [advancedMode, setAdvancedMode] = useState(false)
   const [advancedFps, setAdvancedFps] = useState('')
@@ -264,6 +273,22 @@ function App() {
     }
     videoEl.onerror = () => { setGifVideoDuration(60); URL.revokeObjectURL(url) }
   }, [gifFile])
+
+  // Detect Trim video duration when file changes
+  useEffect(() => {
+    if (!trimFile) return
+    const videoEl = document.createElement('video')
+    const url = URL.createObjectURL(trimFile)
+    videoEl.src = url
+    videoEl.onloadedmetadata = () => {
+      const dur = Math.max(1, Math.floor(videoEl.duration)) || 60
+      setTrimVideoDuration(dur)
+      setTrimStartTime(0)
+      setTrimEndTime(Math.min(10, dur))
+      URL.revokeObjectURL(url)
+    }
+    videoEl.onerror = () => { setTrimVideoDuration(60); URL.revokeObjectURL(url) }
+  }, [trimFile])
 
   const clearResult = () => {
     setResult((previous) => {
@@ -1013,6 +1038,33 @@ function App() {
     }
   }
 
+  const handleTrim = async () => {
+    if (!trimFile) { setTrimError('Please select a video file first.'); return }
+    if (trimEndTime <= trimStartTime) { setTrimError('End time must be after start time.'); return }
+    setTrimError(''); setTrimResult(null); setTrimProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', trimFile)
+      formData.append('startTime', trimStartTime.toString())
+      formData.append('endTime', trimEndTime.toString())
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/trim`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setTrimResult({ url, fileName: `${baseName(trimFile.name)}-trimmed.mp4` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setTrimError(toErrorMessage(err, 'Trim failed.'))
+    } finally {
+      setTrimProcessing(false)
+    }
+  }
+
   const handleDownload = async () => {
     if (!result) return
     try {
@@ -1067,7 +1119,8 @@ function App() {
   const isExtractAudioTool = selectedTool === 'extract-audio'
   const isGifTool = selectedTool === 'gif'
   const isWatermarkTool = selectedTool === 'watermark'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool
+  const isTrimTool = selectedTool === 'trim'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -2241,6 +2294,102 @@ function App() {
               )}
 
               {/* ── Watermark Panel ── */}
+              {/* ── Trim Video Panel ── */}
+              {isTrimTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="6" cy="20" r="2" /><circle cx="18" cy="4" r="2" />
+                        <path d="M8 20 20 4M4 4l16 16" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Trim Video</p>
+                      <p className="panel-desc">Cut a clip from any video.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to trim your videos.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="trim-input" className={`upload-zone${trimFile ? ' has-file' : ''}`}>
+                          <input id="trim-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setTrimFile(f); setTrimResult(null); setTrimError('') }; e.target.value = '' }} />
+                          <div className="upload-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {trimFile ? (
+                            <><p className="upload-title" style={{ color: '#065f46' }}>{trimFile.name}</p><p className="upload-hint">{formatBytes(trimFile.size)} · Click to change</p></>
+                          ) : (
+                            <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p></>
+                          )}
+                        </label>
+                      </div>
+                      {trimFile && (
+                        <div style={{ display: 'grid', gap: '14px' }}>
+                          <div>
+                            <span className="field-label">Start Time — {trimStartTime >= 60 ? `${Math.floor(trimStartTime / 60)}:${String(trimStartTime % 60).padStart(2, '0')}` : `${trimStartTime}s`}</span>
+                            <input type="range" min={0} max={trimVideoDuration - 1} step={1} value={trimStartTime}
+                              onChange={e => { const v = parseInt(e.target.value); setTrimStartTime(v); if (trimEndTime <= v) setTrimEndTime(Math.min(v + 1, trimVideoDuration)) }}
+                              style={{ width: '100%', accentColor: '#2563eb' }} />
+                          </div>
+                          <div>
+                            <span className="field-label">End Time — {trimEndTime >= 60 ? `${Math.floor(trimEndTime / 60)}:${String(trimEndTime % 60).padStart(2, '0')}` : `${trimEndTime}s`}</span>
+                            <input type="range" min={1} max={trimVideoDuration} step={1} value={trimEndTime}
+                              onChange={e => { const v = parseInt(e.target.value); setTrimEndTime(v); if (v <= trimStartTime) setTrimStartTime(Math.max(0, v - 1)) }}
+                              style={{ width: '100%', accentColor: '#2563eb' }} />
+                          </div>
+                          <p style={{ fontSize: '13px', color: '#6b7280', margin: '0' }}>
+                            Clip: {trimStartTime}s → {trimEndTime}s ({trimEndTime - trimStartTime}s)
+                          </p>
+                        </div>
+                      )}
+                      <button type="button" onClick={handleTrim} disabled={!trimFile || trimProcessing} className="action-btn">
+                        {trimProcessing && <span className="action-spinner" />}
+                        {trimProcessing ? 'Trimming...' : 'Trim Video →'}
+                      </button>
+                      {trimProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open during processing
+                        </div>
+                      )}
+                      {trimResult && (
+                        <div className="output-card success">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body">
+                            <p className="output-title">Trimmed Video Ready</p>
+                            <p className="output-meta">Clip: {trimStartTime}s → {trimEndTime}s ({trimEndTime - trimStartTime}s)</p>
+                            <div className="result-actions">
+                              <a href={trimResult.url} download={trimResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Download Video
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {trimError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{trimError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
               {isWatermarkTool && (
                 <>
                   <div className="panel-header">
@@ -2401,7 +2550,7 @@ function App() {
               <a href="#tool-panel" onClick={() => setSelectedTool('compress')} className="footer-link">Compress Video</a>
               <a href="#tool-panel" onClick={() => setSelectedTool('convert')} className="footer-link">Convert to MP4</a>
               <a href="#tool-panel" onClick={() => setSelectedTool('resize')} className="footer-link">Resize for Social</a>
-              <span className="footer-link" style={{ cursor: 'default' }}>Trim Video <span className="footer-link-soon">Soon</span></span>
+              <a href="#tool-panel" onClick={() => setSelectedTool('trim')} className="footer-link">Trim Video</a>
               <span className="footer-link" style={{ cursor: 'default' }}>Remove Audio <span className="footer-link-soon">Soon</span></span>
             </div>
           </div>

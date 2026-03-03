@@ -873,6 +873,39 @@ app.post('/api/watermark',
   }
 );
 
+// ── Pro: Trim Video ───────────────────────────────────────────────────────────
+app.post('/api/trim', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const startTime = parseFloat(req.body.startTime) || 0;
+  const endTime = parseFloat(req.body.endTime);
+  if (!endTime || endTime <= startTime) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'endTime must be greater than startTime' });
+  }
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `trim-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+  const cleanup = () => {
+    if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
+    if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+  };
+
+  runProFFmpeg(
+    ['-i', inputPath, '-ss', startTime.toString(), '-to', endTime.toString(),
+     '-c', 'copy', '-avoid_negative_ts', 'make_zero', outputPath],
+    cleanup, res, req, 'video/mp4', 'ilovevideo-trimmed.mp4'
+  );
+});
+
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
