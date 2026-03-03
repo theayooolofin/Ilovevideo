@@ -973,6 +973,48 @@ app.post('/api/trim', upload.single('video'), async (req, res) => {
   );
 });
 
+app.post('/api/speed', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const speed = parseFloat(req.body.speed);
+  const validSpeeds = [0.25, 0.5, 1.5, 2, 4];
+  if (!validSpeeds.includes(speed)) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid speed value. Must be one of: 0.25, 0.5, 1.5, 2, 4' });
+  }
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `speed-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+  const cleanup = () => {
+    if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
+    if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+  };
+
+  // atempo is limited to 0.5–2.0 per filter; chain two filters for 0.25x and 4x
+  let atempoFilter;
+  if (speed === 0.25) atempoFilter = 'atempo=0.5,atempo=0.5';
+  else if (speed === 4) atempoFilter = 'atempo=2.0,atempo=2.0';
+  else atempoFilter = `atempo=${speed}`;
+
+  runProFFmpeg(
+    ['-i', inputPath,
+     '-vf', `setpts=PTS/${speed}`,
+     '-af', atempoFilter,
+     '-c:v', 'libx264', '-preset', 'fast', '-crf', '26',
+     '-movflags', '+faststart',
+     outputPath],
+    cleanup, res, req, 'video/mp4', 'ilovevideo-speed.mp4'
+  );
+});
+
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {

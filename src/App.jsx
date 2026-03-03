@@ -21,6 +21,7 @@ const TOOL_CARDS = [
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
   { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true },
+  { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true },
   { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
 ]
 
@@ -226,6 +227,12 @@ function App() {
   const [trimStartTime, setTrimStartTime] = useState(0)
   const [trimEndTime, setTrimEndTime] = useState(10)
   const [trimVideoDuration, setTrimVideoDuration] = useState(60)
+  // Speed Change
+  const [speedFile, setSpeedFile] = useState(null)
+  const [speedProcessing, setSpeedProcessing] = useState(false)
+  const [speedResult, setSpeedResult] = useState(null)
+  const [speedError, setSpeedError] = useState('')
+  const [speedValue, setSpeedValue] = useState(2)
 
   // Video to Cartoon
   const [cartoonFile, setCartoonFile] = useState(null)
@@ -1080,6 +1087,32 @@ function App() {
     }
   }
 
+  const handleSpeed = async () => {
+    if (!speedFile) { setSpeedError('Please select a video file first.'); return }
+    setSpeedError(''); setSpeedResult(null); setSpeedProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', speedFile)
+      formData.append('speed', speedValue.toString())
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/speed`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const label = speedValue < 1 ? `slow-${speedValue}x` : `fast-${speedValue}x`
+      setSpeedResult({ url, fileName: `${baseName(speedFile.name)}-${label}.mp4` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setSpeedError(toErrorMessage(err, 'Speed change failed.'))
+    } finally {
+      setSpeedProcessing(false)
+    }
+  }
+
   const handleRemoveAudio = async () => {
     if (!removeAudioFile) { setRemoveAudioError('Please select a video file first.'); return }
     setRemoveAudioError(''); setRemoveAudioResult(null); setRemoveAudioProcessing(true)
@@ -1187,7 +1220,8 @@ function App() {
   const isTrimTool = selectedTool === 'trim'
   const isCartoonTool = selectedTool === 'cartoonify'
   const isRemoveAudioTool = selectedTool === 'remove-audio'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool || isRemoveAudioTool
+  const isSpeedTool = selectedTool === 'speed'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool || isRemoveAudioTool || isSpeedTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -2637,6 +2671,115 @@ function App() {
                         <div className="output-card error">
                           <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
                           <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{watermarkError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── Speed Change Panel ── */}
+              {isSpeedTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M13 10V3L4 14h7v7l9-11h-7Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Speed Change</p>
+                      <p className="panel-desc">Slow motion or speed up any video.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to change video speed.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="speed-input" className={`upload-zone${speedFile ? ' has-file' : ''}`}>
+                          <input id="speed-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setSpeedFile(f); setSpeedResult(null); setSpeedError('') }; e.target.value = '' }} />
+                          <div className="upload-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {speedFile ? (
+                            <><p className="upload-filename">{speedFile.name}</p><p className="upload-hint">Click to change</p></>
+                          ) : (
+                            <><p className="upload-label">Click or drag a video</p><p className="upload-hint">MP4, MOV, MKV, AVI, WEBM</p></>
+                          )}
+                        </label>
+                      </div>
+                      <div>
+                        <span className="field-label">Speed</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {[
+                            { value: 0.25, label: '0.25×', sublabel: 'Very slow' },
+                            { value: 0.5,  label: '0.5×',  sublabel: 'Slow motion' },
+                            { value: 1.5,  label: '1.5×',  sublabel: 'Faster' },
+                            { value: 2,    label: '2×',    sublabel: 'Double speed' },
+                            { value: 4,    label: '4×',    sublabel: 'Very fast' },
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setSpeedValue(opt.value)}
+                              style={{
+                                flex: '1 1 60px',
+                                padding: '10px 8px',
+                                borderRadius: '10px',
+                                border: speedValue === opt.value ? '2px solid #2563eb' : '2px solid #e5e7eb',
+                                background: speedValue === opt.value ? '#eff6ff' : '#fff',
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                              }}
+                            >
+                              <div style={{ fontSize: '16px', fontWeight: '700', color: speedValue === opt.value ? '#2563eb' : '#111827' }}>{opt.label}</div>
+                              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{opt.sublabel}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleSpeed} disabled={!speedFile || speedProcessing} className="action-btn">
+                        {speedProcessing && <span className="action-spinner" />}
+                        {speedProcessing ? 'Processing...' : 'Change Speed →'}
+                      </button>
+                      {speedProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open during processing
+                        </div>
+                      )}
+                      {speedResult && (
+                        <div className="output-card success with-preview">
+                          <video src={speedResult.url} controls preload="metadata" />
+                          <div className="preview-body">
+                            <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                            <div className="output-body">
+                              <p className="output-title">Speed Changed</p>
+                              <p className="output-meta">{speedValue}× speed applied</p>
+                              <div className="result-actions">
+                                <a href={speedResult.url} download={speedResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  Download Video
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {speedError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{speedError}</p></div>
                         </div>
                       )}
                     </>
