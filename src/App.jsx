@@ -1173,10 +1173,12 @@ function App() {
           {/* ── Hero ── */}
       <section className="hero-section">
         <div className="hero-inner">
+          {!user && (
           <div className="hero-badge">
             <span className="hero-badge-dot" />
             100% Free · No Sign-Up Required
           </div>
+          )}
           <h1 className="hero-title">
             Do more with<br />
             your <span className="hero-title-accent">videos.</span>
