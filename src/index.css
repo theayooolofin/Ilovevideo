@@ -1383,3 +1383,17 @@ button, a, input, select, textarea, label {
   .how-section { padding-left: 16px; padding-right: 16px; }
   .footer-shell { padding-left: 16px; padding-right: 16px; }
 }
+
+/* ── Pro Dashboard ──────────────────────────────────────────── */
+.pro-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 700px) {
+  .pro-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from './supabase'
+import { supabase } from './lib/supabase'
 import posthog from 'posthog-js'
 import StatsBar from './components/StatsBar'
+import ProDashboard from './components/ProDashboard'
+import ProBadge from './components/ProBadge'
+import useProStatus from './hooks/useProStatus'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://72.62.154.2'
 
@@ -190,6 +193,7 @@ function App() {
   const [proPrice, setProPrice] = useState('$4.99')
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [accountInfo, setAccountInfo] = useState(null)
+  const [page, setPage] = useState(() => window.location.pathname === '/pro' ? 'pro' : 'home')
 
   const compressionPreset = useMemo(
     () => COMPRESSION_PRESETS.find((preset) => preset.id === compressionPresetId) ?? COMPRESSION_PRESETS[0],
@@ -238,6 +242,10 @@ function App() {
     const percentage = selectedFile.size > 0 ? (Math.abs(delta) / selectedFile.size) * 100 : 0
     return { delta, percentage }
   }, [selectedFile, result])
+  const { isPro: hasForeverPro } = useProStatus(user?.email)
+  const hasProAccess = isPro || hasForeverPro
+  const accountHasPro = Boolean(accountInfo?.is_pro) || hasProAccess
+  const canCancelPaidPro = Boolean(accountInfo?.is_pro ?? isPro) && !hasForeverPro
 
   useEffect(
     () => () => {
@@ -260,7 +268,7 @@ function App() {
         const data = await res.json()
         setUsageCount(data.count)
         setUsageLimit(data.limit ?? FREE_LIMIT)
-        if (data.is_pro && !isPro) posthog.capture('pro_purchased')
+        if (data.is_pro && !hasProAccess) posthog.capture('pro_purchased')
         setIsPro(data.is_pro ?? false)
       }
     } catch {}
@@ -356,6 +364,17 @@ function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
+
+  const navigate = (path) => {
+    window.history.pushState({}, '', path)
+    setPage(path === '/pro' ? 'pro' : 'home')
+  }
+
+  useEffect(() => {
+    const onPop = () => setPage(window.location.pathname === '/pro' ? 'pro' : 'home')
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const openAccountModal = async () => {
     setShowAccountModal(true)
@@ -503,7 +522,7 @@ function App() {
   }
 
   const handleCompress = async () => {
-    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
+    if (!hasProAccess && usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
     // ── Image compression (Canvas API, browser-side) ──────────────────────
     if (compressMediaType === 'image') {
       if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
@@ -582,7 +601,7 @@ function App() {
       return
     }
 
-    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
+    if (!hasProAccess && usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
 
     setErrorMessage('')
     clearResult()
@@ -697,7 +716,7 @@ function App() {
   }
 
   const handleResizeImage = async () => {
-    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
+    if (!hasProAccess && usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return; }
     if (!selectedFile || !isImageFile(selectedFile) || isProcessing) {
       setErrorMessage('Please select an image file for image resize mode.')
       return
@@ -775,7 +794,7 @@ function App() {
   }
 
   const handleConvert = async () => {
-    if (usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
+    if (!hasProAccess && usageCount >= usageLimit) { posthog.capture('limit_reached', { limit: usageLimit }); setShowLimitModal(true); return }
     if (!selectedFile || !isVideoFile(selectedFile)) {
       setErrorMessage('Please select a video file first.')
       return
@@ -961,25 +980,34 @@ function App() {
               <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#111827', margin: 0 }}>My Account</h2>
               <button onClick={() => setShowAccountModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#6b7280', lineHeight: 1 }}>✕</button>
             </div>
-            <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px', wordBreak: 'break-all' }}>{accountInfo?.email ?? user?.email}</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: '14px', color: '#6b7280', margin: 0, wordBreak: 'break-all' }}>{accountInfo?.email ?? user?.email}</p>
+              {accountHasPro && <ProBadge size="md" className="shrink-0" />}
+            </div>
             <div style={{ marginBottom: '24px' }}>
-              {(accountInfo?.is_pro ?? isPro) ? (
-                <span style={{ display: 'inline-block', background: '#d1fae5', color: '#065f46', fontSize: '13px', fontWeight: '700', padding: '4px 12px', borderRadius: '999px' }}>⚡ Pro</span>
+              {accountHasPro ? (
+                <span style={{ display: 'inline-block', background: '#d1fae5', color: '#065f46', fontSize: '13px', fontWeight: '700', padding: '4px 12px', borderRadius: '999px' }}>Pro</span>
               ) : (
                 <span style={{ display: 'inline-block', background: '#f3f4f6', color: '#6b7280', fontSize: '13px', fontWeight: '600', padding: '4px 12px', borderRadius: '999px' }}>Free</span>
               )}
             </div>
-            {(accountInfo?.is_pro ?? isPro) ? (
+            {accountHasPro ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {accountInfo?.pro_since && (
                   <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
                     Pro since {new Date(accountInfo.pro_since).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
                 )}
-                <button onClick={handleCancelPro}
-                  style={{ padding: '11px', borderRadius: '10px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                  Cancel Pro
-                </button>
+                {canCancelPaidPro ? (
+                  <button onClick={handleCancelPro}
+                    style={{ padding: '11px', borderRadius: '10px', border: 'none', background: '#fee2e2', color: '#b91c1c', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                    Cancel Pro
+                  </button>
+                ) : (
+                  <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
+                    Lifetime Pro is active for this account.
+                  </p>
+                )}
               </div>
             ) : (
               <button onClick={() => { setShowAccountModal(false); handleGoPro() }}
@@ -1067,7 +1095,13 @@ function App() {
           <div className="nav-divider" />
           {user ? (
             <>
-              <button type="button" onClick={openAccountModal} style={{ fontSize: '13px', color: '#6b7280', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>{user.email}</button>
+              {hasProAccess && (
+                <button type="button" className="nav-link" style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={() => navigate('/pro')}>Dashboard</button>
+              )}
+              <button type="button" onClick={openAccountModal} style={{ fontSize: '13px', color: '#6b7280', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+                {hasProAccess && <ProBadge label="Pro" />}
+              </button>
               <button type="button" className="nav-link" style={{ marginLeft: '12px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }} onClick={handleSignOut}>Sign Out</button>
             </>
           ) : (
@@ -1104,7 +1138,13 @@ function App() {
               <a href="#how-it-works" className="mobile-menu-item" onClick={() => setMobileMenuOpen(false)}>How it works</a>
               {user ? (
                 <>
-                  <button type="button" className="mobile-menu-user" style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%' }} onClick={() => { openAccountModal(); setMobileMenuOpen(false) }}>{user.email || 'My Account'}</button>
+                  {hasProAccess && (
+                    <button type="button" className="mobile-menu-item" onClick={() => { navigate('/pro'); setMobileMenuOpen(false) }}>Dashboard</button>
+                  )}
+                  <button type="button" className="mobile-menu-user" style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }} onClick={() => { openAccountModal(); setMobileMenuOpen(false) }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email || 'My Account'}</span>
+                    {hasProAccess && <ProBadge label="Pro" />}
+                  </button>
                   <button type="button" className="mobile-menu-item" onClick={() => { handleSignOut(); setMobileMenuOpen(false) }}>Sign Out</button>
                 </>
               ) : (
@@ -1117,9 +1157,20 @@ function App() {
           </>
         )}
       </nav>
-      {user && <StatsBar key={user.id} />}
+      {page === 'pro' ? (
+        <ProDashboard
+          user={user}
+          isPro={hasProAccess}
+          proPrice={proPrice}
+          handleGoPro={handleGoPro}
+          handleCancelPro={handleCancelPro}
+          onNavigateHome={() => navigate('/')}
+        />
+      ) : (
+        <>
+          {user && <StatsBar key={user.id} />}
 
-      {/* ── Hero ── */}
+          {/* ── Hero ── */}
       <section className="hero-section">
         <div className="hero-inner">
           <div className="hero-badge">
@@ -1322,7 +1373,7 @@ function App() {
                   </button>
                   <p className="status-line">{statusMessage}</p>
 
-                  {isCompressTool && compressMediaType === 'video' && usageCount > 0 && !isProcessing && (
+                  {isCompressTool && compressMediaType === 'video' && usageCount > 0 && !isProcessing && !hasProAccess && (
                     <p style={{ textAlign: 'center', fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
                       {usageCount} of {usageLimit} free compressions used today
                     </p>
@@ -1779,6 +1830,8 @@ function App() {
           </div>
         </div>
       </footer>
+        </>
+      )}
     </main>
   )
 }

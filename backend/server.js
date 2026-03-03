@@ -14,6 +14,7 @@ const app = express();
 app.use(cors({
   origin: [
     'https://ilovevideo.fun',
+    'https://www.ilovevideo.fun',
     'http://localhost:5173',
     'http://localhost:3000'
   ],
