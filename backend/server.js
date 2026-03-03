@@ -150,21 +150,21 @@ const upload = multer({
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
     '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
-    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
-    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
-    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   // Visually lossless: original resolution, no scaling
@@ -212,8 +212,11 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     const originalSize = fs.statSync(inputPath).size;
     const outputSize = fs.statSync(outputPath).size;
 
-    // Size guard: if output is larger than input, return the original file unchanged
-    if (opts.sizeGuard && outputSize > originalSize) {
+    console.log(`Compression result: Input ${originalSize} vs Output ${outputSize}`);
+
+    // Size guard: if output is >= input, return the original file unchanged
+    if (opts.sizeGuard && outputSize >= originalSize) {
+      console.log('Output is larger. Keeping original file to preserve quality.');
       fs.unlink(outputPath, () => {});
       res.setHeader('Content-Type', 'video/mp4');
       res.setHeader('X-Original-Size', originalSize.toString());
@@ -309,7 +312,7 @@ app.post('/api/compress', upload.single('video'), async (req, res) => {
 
   res.setHeader('Content-Disposition', 'attachment; filename="ilovevideo-compressed.mp4"');
 
-  runFFmpeg(['-i', inputPath, ...presetArgs, outputPath], inputPath, outputPath, res, req);
+  runFFmpeg(['-i', inputPath, ...presetArgs, outputPath], inputPath, outputPath, res, req, { sizeGuard: true });
 });
 
 app.post('/api/resize', upload.single('video'), async (req, res) => {
