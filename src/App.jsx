@@ -20,6 +20,7 @@ const TOOL_CARDS = [
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
+  { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true },
   { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
 ]
 
@@ -232,6 +233,12 @@ function App() {
   const [cartoonResult, setCartoonResult] = useState(null)
   const [cartoonError, setCartoonError] = useState('')
   const [cartoonStyle, setCartoonStyle] = useState('comic')
+
+  // Remove audio
+  const [removeAudioFile, setRemoveAudioFile] = useState(null)
+  const [removeAudioProcessing, setRemoveAudioProcessing] = useState(false)
+  const [removeAudioResult, setRemoveAudioResult] = useState(null)
+  const [removeAudioError, setRemoveAudioError] = useState('')
 
   // Advanced compress settings
   const [advancedMode, setAdvancedMode] = useState(false)
@@ -1073,6 +1080,31 @@ function App() {
     }
   }
 
+  const handleRemoveAudio = async () => {
+    if (!removeAudioFile) { setRemoveAudioError('Please select a video file first.'); return }
+    setRemoveAudioError(''); setRemoveAudioResult(null); setRemoveAudioProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', removeAudioFile)
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/remove-audio`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        if (errData.error === 'LIMIT_REACHED') { setShowLimitModal(true); return }
+        throw new Error(errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setRemoveAudioResult({ url, fileName: `${baseName(removeAudioFile.name)}-muted.mp4` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setRemoveAudioError(toErrorMessage(err, 'Failed to remove audio.'))
+    } finally {
+      setRemoveAudioProcessing(false)
+    }
+  }
+
   const handleCartoonify = async () => {
     if (!cartoonFile) { setCartoonError('Please select a video file first.'); return }
     setCartoonError(''); setCartoonResult(null); setCartoonProcessing(true)
@@ -1154,7 +1186,8 @@ function App() {
   const isWatermarkTool = selectedTool === 'watermark'
   const isTrimTool = selectedTool === 'trim'
   const isCartoonTool = selectedTool === 'cartoonify'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool
+  const isRemoveAudioTool = selectedTool === 'remove-audio'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool || isRemoveAudioTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -2334,6 +2367,67 @@ function App() {
                 </>
               )}
 
+              {/* ── Remove Audio Panel ── */}
+              {isRemoveAudioTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 9v6m6-6v6M4.5 12a7.5 7.5 0 0 0 15 0M4.5 12a7.5 7.5 0 0 1 15 0M12 3v1m0 16v1" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="4" y1="4" x2="20" y2="20" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Remove Audio</p>
+                      <p className="panel-desc">Strip the audio track from any video instantly.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  <div>
+                    <span className="field-label">Upload Video</span>
+                    <label htmlFor="remove-audio-input" className={`upload-zone${removeAudioFile ? ' has-file' : ''}`}>
+                      <input id="remove-audio-input" type="file" accept="video/*" className="sr-only"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) { setRemoveAudioFile(f); setRemoveAudioResult(null); setRemoveAudioError('') }; e.target.value = '' }} />
+                      <div className="upload-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      {removeAudioFile ? (
+                        <><p className="upload-title" style={{ color: '#065f46' }}>{removeAudioFile.name}</p><p className="upload-hint">{formatBytes(removeAudioFile.size)} · Click to change</p></>
+                      ) : (
+                        <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p></>
+                      )}
+                    </label>
+                  </div>
+                  <button type="button" onClick={handleRemoveAudio} disabled={!removeAudioFile || removeAudioProcessing} className="action-btn">
+                    {removeAudioProcessing && <span className="action-spinner" />}
+                    {removeAudioProcessing ? 'Removing Audio...' : 'Remove Audio →'}
+                  </button>
+                  {removeAudioResult && (
+                    <div className="output-card success">
+                      <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                      <div className="output-body">
+                        <p className="output-title">Audio Removed</p>
+                        <p className="output-meta">Video is now silent — ready to download</p>
+                        <div className="result-actions">
+                          <a href={removeAudioResult.url} download={removeAudioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            Download Video
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {removeAudioError && (
+                    <div className="output-card error">
+                      <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                      <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{removeAudioError}</p></div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* ── Watermark Panel ── */}
               {/* ── Trim Video Panel ── */}
               {isTrimTool && (
@@ -2684,7 +2778,7 @@ function App() {
               <a href="#tool-panel" onClick={() => setSelectedTool('convert')} className="footer-link">Convert to MP4</a>
               <a href="#tool-panel" onClick={() => setSelectedTool('resize')} className="footer-link">Resize for Social</a>
               <a href="#tool-panel" onClick={() => setSelectedTool('trim')} className="footer-link">Trim Video</a>
-              <span className="footer-link" style={{ cursor: 'default' }}>Remove Audio <span className="footer-link-soon">Soon</span></span>
+              <a href="#tool-panel" onClick={() => setSelectedTool('remove-audio')} className="footer-link">Remove Audio</a>
             </div>
           </div>
           <div>

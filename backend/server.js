@@ -770,6 +770,31 @@ app.post('/api/send-welcome', async (req, res) => {
   }
 });
 
+// ── Remove Audio (free, counts against daily limit) ──────────────────────────
+app.post('/api/remove-audio', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { key, limit, isPro } = await resolveKeyAndLimit(req);
+  const usage = getUsageForKey(key);
+
+  if (!isPro && usage.count >= limit) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(429).json({ error: 'LIMIT_REACHED', limit });
+  }
+  incrementUsageForKey(key);
+
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `muted-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+  res.setHeader('Content-Disposition', 'attachment; filename="ilovevideo-muted.mp4"');
+
+  runFFmpeg(
+    ['-i', inputPath, '-c:v', 'copy', '-an', '-movflags', '+faststart', outputPath],
+    inputPath, outputPath, res, req
+  );
+});
+
 // ── Pro: Extract Audio ───────────────────────────────────────────────────────
 app.post('/api/extract-audio', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
