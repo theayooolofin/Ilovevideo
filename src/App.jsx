@@ -1830,25 +1830,28 @@ function App() {
 
                   {/* Output Card */}
                   {result && (
-                    <div className="output-card success">
-                      <div className="output-icon">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
-                      </div>
-                      <div className="output-body">
-                        <p className="output-title">Output Ready</p>
-                        <p className="output-meta">
-                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
-                          {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
-                          {result.summary && ` · ${result.summary}`}
-                        </p>
-                        <div className="result-actions">
-                          <button type="button" onClick={handleDownload} className="download-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            Download File
-                          </button>
-                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
-                            📱 Share on WhatsApp
-                          </button>
+                    <div className={`output-card success${compressMediaType === 'video' ? ' with-preview' : ''}`}>
+                      {compressMediaType === 'video' && <video src={result.url} controls preload="metadata" />}
+                      <div className={compressMediaType === 'video' ? 'preview-body' : undefined} style={compressMediaType !== 'video' ? { display: 'contents' } : undefined}>
+                        <div className="output-icon">
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
+                        </div>
+                        <div className="output-body">
+                          <p className="output-title">Output Ready</p>
+                          <p className="output-meta">
+                            {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
+                            {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
+                            {result.summary && ` · ${result.summary}`}
+                          </p>
+                          <div className="result-actions">
+                            <button type="button" onClick={handleDownload} className="download-btn">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              Download File
+                            </button>
+                            <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                              📱 Share on WhatsApp
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2016,27 +2019,30 @@ function App() {
                     </div>
                   )}
 
-                  {/* Output Card */}
+                  {/* Output Card — Resize (always video) */}
                   {result && (
-                    <div className="output-card success">
-                      <div className="output-icon">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
-                      </div>
-                      <div className="output-body">
-                        <p className="output-title">Output Ready</p>
-                        <p className="output-meta">
-                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
-                          {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
-                          {result.summary && ` · ${result.summary}`}
-                        </p>
-                        <div className="result-actions">
-                          <button type="button" onClick={handleDownload} className="download-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            Download File
-                          </button>
-                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
-                            📱 Share on WhatsApp
-                          </button>
+                    <div className={`output-card success${resizeMediaType === 'video' ? ' with-preview' : ''}`}>
+                      {resizeMediaType === 'video' && <video src={result.url} controls preload="metadata" />}
+                      <div className={resizeMediaType === 'video' ? 'preview-body' : undefined} style={resizeMediaType !== 'video' ? { display: 'contents' } : undefined}>
+                        <div className="output-icon">
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
+                        </div>
+                        <div className="output-body">
+                          <p className="output-title">Output Ready</p>
+                          <p className="output-meta">
+                            {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
+                            {resultStats && ` · ${resultStats.delta >= 0 ? '↓' : '↑'} ${formatBytes(Math.abs(resultStats.delta))} (${resultStats.percentage.toFixed(1)}%)`}
+                            {result.summary && ` · ${result.summary}`}
+                          </p>
+                          <div className="result-actions">
+                            <button type="button" onClick={handleDownload} className="download-btn">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              Download File
+                            </button>
+                            <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                              📱 Share on WhatsApp
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2146,24 +2152,27 @@ function App() {
 
                   {/* Output Card */}
                   {result && (
-                    <div className="output-card success">
-                      <div className="output-icon">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
-                      </div>
-                      <div className="output-body">
-                        <p className="output-title">Output Ready</p>
-                        <p className="output-meta">
-                          {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
-                          {result.summary && ` · ${result.summary}`}
-                        </p>
-                        <div className="result-actions">
-                          <button type="button" onClick={handleDownload} className="download-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            Download MP4
-                          </button>
-                          <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
-                            📱 Share on WhatsApp
-                          </button>
+                    <div className="output-card success with-preview">
+                      <video src={result.url} controls preload="metadata" />
+                      <div className="preview-body">
+                        <div className="output-icon">
+                          <svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg>
+                        </div>
+                        <div className="output-body">
+                          <p className="output-title">Output Ready</p>
+                          <p className="output-meta">
+                            {result.sizeBytes != null ? formatBytes(result.sizeBytes) : 'Ready to download'}
+                            {result.summary && ` · ${result.summary}`}
+                          </p>
+                          <div className="result-actions">
+                            <button type="button" onClick={handleDownload} className="download-btn">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              Download MP4
+                            </button>
+                            <button type="button" onClick={handleWhatsAppShare} className="wa-share-btn">
+                              📱 Share on WhatsApp
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2235,16 +2244,19 @@ function App() {
                         </div>
                       )}
                       {audioResult && (
-                        <div className="output-card success">
-                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
-                          <div className="output-body">
-                            <p className="output-title">MP3 Ready</p>
-                            <p className="output-meta">Audio extracted successfully</p>
-                            <div className="result-actions">
-                              <a href={audioResult.url} download={audioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                Download MP3
-                              </a>
+                        <div className="output-card success with-preview">
+                          <audio src={audioResult.url} controls />
+                          <div className="preview-body">
+                            <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                            <div className="output-body">
+                              <p className="output-title">MP3 Ready</p>
+                              <p className="output-meta">Audio extracted successfully</p>
+                              <div className="result-actions">
+                                <a href={audioResult.url} download={audioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  Download MP3
+                                </a>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2341,18 +2353,20 @@ function App() {
                         </div>
                       )}
                       {gifResult && (
-                        <div className="output-card success">
-                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
-                          <div className="output-body">
-                            <p className="output-title">GIF Ready</p>
-                            <p className="output-meta">{gifDuration}s · {gifScale}px wide · 15fps</p>
-                            <div className="result-actions">
-                              <a href={gifResult.url} download={gifResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                Download GIF
-                              </a>
+                        <div className="output-card success with-preview">
+                          <img src={gifResult.url} alt="GIF preview" className="preview-gif" />
+                          <div className="preview-body">
+                            <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                            <div className="output-body">
+                              <p className="output-title">GIF Ready</p>
+                              <p className="output-meta">{gifDuration}s · {gifScale}px wide · 15fps</p>
+                              <div className="result-actions">
+                                <a href={gifResult.url} download={gifResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  Download GIF
+                                </a>
+                              </div>
                             </div>
-                            <div style={{ marginTop: '12px' }}><img src={gifResult.url} alt="GIF preview" style={{ maxWidth: '100%', borderRadius: '8px', border: '1px solid #e5e7eb' }} /></div>
                           </div>
                         </div>
                       )}
@@ -2405,16 +2419,19 @@ function App() {
                     {removeAudioProcessing ? 'Removing Audio...' : 'Remove Audio →'}
                   </button>
                   {removeAudioResult && (
-                    <div className="output-card success">
-                      <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
-                      <div className="output-body">
-                        <p className="output-title">Audio Removed</p>
-                        <p className="output-meta">Video is now silent — ready to download</p>
-                        <div className="result-actions">
-                          <a href={removeAudioResult.url} download={removeAudioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            Download Video
-                          </a>
+                    <div className="output-card success with-preview">
+                      <video src={removeAudioResult.url} controls preload="metadata" />
+                      <div className="preview-body">
+                        <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                        <div className="output-body">
+                          <p className="output-title">Audio Removed</p>
+                          <p className="output-meta">Video is now silent — ready to download</p>
+                          <div className="result-actions">
+                            <a href={removeAudioResult.url} download={removeAudioResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              Download Video
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2500,16 +2517,19 @@ function App() {
                         </div>
                       )}
                       {trimResult && (
-                        <div className="output-card success">
-                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
-                          <div className="output-body">
-                            <p className="output-title">Trimmed Video Ready</p>
-                            <p className="output-meta">Clip: {trimStartTime}s → {trimEndTime}s ({trimEndTime - trimStartTime}s)</p>
-                            <div className="result-actions">
-                              <a href={trimResult.url} download={trimResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                Download Video
-                              </a>
+                        <div className="output-card success with-preview">
+                          <video src={trimResult.url} controls preload="metadata" />
+                          <div className="preview-body">
+                            <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                            <div className="output-body">
+                              <p className="output-title">Trimmed Video Ready</p>
+                              <p className="output-meta">Clip: {trimStartTime}s → {trimEndTime}s ({trimEndTime - trimStartTime}s)</p>
+                              <div className="result-actions">
+                                <a href={trimResult.url} download={trimResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  Download Video
+                                </a>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2596,16 +2616,19 @@ function App() {
                         </div>
                       )}
                       {watermarkResult && (
-                        <div className="output-card success">
-                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
-                          <div className="output-body">
-                            <p className="output-title">Watermarked Video Ready</p>
-                            <p className="output-meta">Logo positioned: {watermarkPosition.replace('-', ' ')}</p>
-                            <div className="result-actions">
-                              <a href={watermarkResult.url} download={watermarkResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                Download Video
-                              </a>
+                        <div className="output-card success with-preview">
+                          <video src={watermarkResult.url} controls preload="metadata" />
+                          <div className="preview-body">
+                            <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                            <div className="output-body">
+                              <p className="output-title">Watermarked Video Ready</p>
+                              <p className="output-meta">Logo positioned: {watermarkPosition.replace('-', ' ')}</p>
+                              <div className="result-actions">
+                                <a href={watermarkResult.url} download={watermarkResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                  Download Video
+                                </a>
+                              </div>
                             </div>
                           </div>
                         </div>
