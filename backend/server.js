@@ -873,6 +873,44 @@ app.post('/api/watermark',
   }
 );
 
+// ── Pro: Video to Cartoon ────────────────────────────────────────────────────
+app.post('/api/cartoonify', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const style = req.body.style || 'comic';
+  const inputPath = req.file.path;
+  const outputPath = path.join(OUTPUT_DIR,
+    `cartoon-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.mp4`);
+
+  const cleanup = () => {
+    if (fs.existsSync(inputPath)) fs.unlink(inputPath, () => {});
+    if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
+  };
+
+  const filters = {
+    comic:  'hqdn3d=4:3:6:4.5,split[a][b];[a]edgedetect=low=0.1:high=0.4:mode=colormix[e];[b][e]blend=all_mode=multiply,eq=saturation=2.0:contrast=1.2',
+    anime:  'hqdn3d=8:6:12:9,split[a][b];[a]edgedetect=low=0.05:high=0.2:mode=colormix[e];[b][e]blend=all_mode=multiply,eq=saturation=1.8:brightness=0.05',
+    sketch: 'hue=s=0,split[a][b];[a]negate[neg];[neg]gblur=sigma=8[blur];[b][blur]blend=all_mode=grainextract,eq=contrast=1.8:brightness=0.1',
+  };
+
+  const vf = filters[style] || filters.comic;
+
+  runProFFmpeg(
+    ['-i', inputPath,
+     '-vf', vf,
+     '-c:v', 'libx264', '-crf', '23', '-preset', 'fast',
+     '-map', '0:v', '-map', '0:a?', '-c:a', 'aac', '-b:a', '128k',
+     '-movflags', '+faststart', outputPath],
+    cleanup, res, req, 'video/mp4', 'ilovevideo-cartoon.mp4'
+  );
+});
+
 // ── Pro: Trim Video ───────────────────────────────────────────────────────────
 app.post('/api/trim', upload.single('video'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });

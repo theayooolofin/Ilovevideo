@@ -20,6 +20,7 @@ const TOOL_CARDS = [
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
+  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: true, pro: true },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -224,6 +225,13 @@ function App() {
   const [trimStartTime, setTrimStartTime] = useState(0)
   const [trimEndTime, setTrimEndTime] = useState(10)
   const [trimVideoDuration, setTrimVideoDuration] = useState(60)
+
+  // Video to Cartoon
+  const [cartoonFile, setCartoonFile] = useState(null)
+  const [cartoonProcessing, setCartoonProcessing] = useState(false)
+  const [cartoonResult, setCartoonResult] = useState(null)
+  const [cartoonError, setCartoonError] = useState('')
+  const [cartoonStyle, setCartoonStyle] = useState('comic')
 
   // Advanced compress settings
   const [advancedMode, setAdvancedMode] = useState(false)
@@ -1065,6 +1073,31 @@ function App() {
     }
   }
 
+  const handleCartoonify = async () => {
+    if (!cartoonFile) { setCartoonError('Please select a video file first.'); return }
+    setCartoonError(''); setCartoonResult(null); setCartoonProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', cartoonFile)
+      formData.append('style', cartoonStyle)
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/cartoonify`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      setCartoonResult({ url, fileName: `${baseName(cartoonFile.name)}-cartoon.mp4` })
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setCartoonError(toErrorMessage(err, 'Cartoonify failed.'))
+    } finally {
+      setCartoonProcessing(false)
+    }
+  }
+
   const handleDownload = async () => {
     if (!result) return
     try {
@@ -1120,7 +1153,8 @@ function App() {
   const isGifTool = selectedTool === 'gif'
   const isWatermarkTool = selectedTool === 'watermark'
   const isTrimTool = selectedTool === 'trim'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool
+  const isCartoonTool = selectedTool === 'cartoonify'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -2479,6 +2513,98 @@ function App() {
                         <div className="output-card error">
                           <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
                           <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{watermarkError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── Video to Cartoon Panel ── */}
+              {isCartoonTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m1.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Video to Cartoon</p>
+                      <p className="panel-desc">Apply an animated art style to any video.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to cartoonify your videos.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="cartoon-input" className={`upload-zone${cartoonFile ? ' has-file' : ''}`}>
+                          <input id="cartoon-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setCartoonFile(f); setCartoonResult(null); setCartoonError('') }; e.target.value = '' }} />
+                          <div className="upload-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {cartoonFile ? (
+                            <><p className="upload-title" style={{ color: '#065f46' }}>{cartoonFile.name}</p><p className="upload-hint">{formatBytes(cartoonFile.size)} · Click to change</p></>
+                          ) : (
+                            <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p></>
+                          )}
+                        </label>
+                      </div>
+                      <div>
+                        <span className="field-label">Style</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {[
+                            { id: 'comic',  label: '🎨 Comic Book', desc: 'Bold edges, vivid colors' },
+                            { id: 'anime',  label: '✨ Anime',      desc: 'Soft shading, bright tones' },
+                            { id: 'sketch', label: '✏️ Pencil Sketch', desc: 'Grayscale, hand-drawn look' },
+                          ].map(s => (
+                            <button key={s.id} type="button" onClick={() => setCartoonStyle(s.id)}
+                              style={{ padding: '10px 16px', borderRadius: '10px', border: '1.5px solid', borderColor: cartoonStyle === s.id ? '#2563eb' : '#e5e7eb', background: cartoonStyle === s.id ? '#eff6ff' : '#fff', color: cartoonStyle === s.id ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
+                              <div>{s.label}</div>
+                              <div style={{ fontSize: '11px', fontWeight: '400', color: cartoonStyle === s.id ? '#3b82f6' : '#9ca3af', marginTop: '2px' }}>{s.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleCartoonify} disabled={!cartoonFile || cartoonProcessing} className="action-btn">
+                        {cartoonProcessing && <span className="action-spinner" />}
+                        {cartoonProcessing ? 'Applying Style...' : 'Cartoonify →'}
+                      </button>
+                      {cartoonProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open — long videos may take several minutes
+                        </div>
+                      )}
+                      {cartoonResult && (
+                        <div className="output-card success">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body">
+                            <p className="output-title">Cartoon Video Ready</p>
+                            <p className="output-meta">Style: {cartoonStyle.charAt(0).toUpperCase() + cartoonStyle.slice(1)}</p>
+                            <div className="result-actions">
+                              <a href={cartoonResult.url} download={cartoonResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                Download Video
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {cartoonError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{cartoonError}</p></div>
                         </div>
                       )}
                     </>
