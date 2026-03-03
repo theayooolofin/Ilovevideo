@@ -150,7 +150,7 @@ export default function ProDashboard({ user, isPro, proPrice, handleGoPro, handl
     <div style={{ minHeight: '100vh', background: '#f0f4ff' }}>
 
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
-      <div style={{
+      <div className="pro-hero-section" style={{
         background: 'linear-gradient(135deg, #0c1445 0%, #1c2f8a 40%, #0d47a1 70%, #0c1445 100%)',
         padding: '40px 24px 90px',
         position: 'relative',
@@ -174,7 +174,7 @@ export default function ProDashboard({ user, isPro, proPrice, handleGoPro, handl
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '900', color: '#fff', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
+                <h1 className="pro-hero-h1" style={{ margin: 0, fontWeight: '900', color: '#fff', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
                   Welcome back, {displayName} 👋
                 </h1>
                 <span style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#78350f', fontSize: '11px', fontWeight: '900', padding: '4px 11px', borderRadius: '999px', letterSpacing: '0.08em', boxShadow: '0 2px 8px rgba(245,158,11,0.4)' }}>
@@ -187,7 +187,7 @@ export default function ProDashboard({ user, isPro, proPrice, handleGoPro, handl
           </div>
 
           {/* Glassmorphism stat cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
             {heroStats.map((stat, i) => (
               <div key={i} style={{
                 background: 'rgba(255,255,255,0.06)',
@@ -365,7 +365,7 @@ export default function ProDashboard({ user, isPro, proPrice, handleGoPro, handl
                             {isImage ? '🖼️' : '🎬'}
                           </div>
                           <div style={{ minWidth: 0 }}>
-                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{name}</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'min(200px, 45vw)' }}>{name}</p>
                             <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{date}</p>
                           </div>
                         </div>

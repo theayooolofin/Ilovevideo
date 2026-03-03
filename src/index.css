@@ -1411,3 +1411,17 @@ button, a, input, select, textarea, label {
 .pro-tool-card:hover {
   transform: translateY(-3px);
 }
+
+.pro-hero-h1 {
+  font-size: 26px;
+}
+
+@media (max-width: 480px) {
+  .pro-hero-h1 {
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .pro-hero-section {
+    padding-bottom: 70px !important;
+  }
+}
