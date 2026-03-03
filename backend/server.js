@@ -893,10 +893,14 @@ app.post('/api/cartoonify', upload.single('video'), async (req, res) => {
     if (fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
   };
 
+  // Correct technique: smooth colors → wires-mode edges → negate to black outlines → multiply
   const filters = {
-    comic:  'hqdn3d=4:3:6:4.5,split[a][b];[a]edgedetect=low=0.1:high=0.4:mode=colormix[e];[b][e]blend=all_mode=multiply,eq=saturation=2.0:contrast=1.2',
-    anime:  'hqdn3d=8:6:12:9,split[a][b];[a]edgedetect=low=0.05:high=0.2:mode=colormix[e];[b][e]blend=all_mode=multiply,eq=saturation=1.8:brightness=0.05',
-    sketch: 'hue=s=0,split[a][b];[a]negate[neg];[neg]gblur=sigma=8[blur];[b][blur]blend=all_mode=grainextract,eq=contrast=1.8:brightness=0.1',
+    // Comic Book: strong denoise, bold black outlines, vivid posterised colours
+    comic:  'hqdn3d=8:6:12:9,split[sm][ed];[ed]edgedetect=low=0.08:high=0.25:mode=wires[w];[w]negate[ol];[sm][ol]blend=all_mode=multiply,eq=saturation=2.2:contrast=1.3:gamma=0.88,unsharp=3:3:1:3:3:0',
+    // Anime: heavy smooth for flat colour areas, soft thin outlines, bright palette
+    anime:  'hqdn3d=14:12:20:16,split[sm][ed];[ed]edgedetect=low=0.03:high=0.1:mode=wires[w];[w]negate[ol];[sm][ol]blend=all_mode=multiply,eq=saturation=2.0:contrast=1.05:brightness=0.04',
+    // Pencil Sketch: greyscale → dodge blend for hand-drawn pencil look
+    sketch: 'hue=s=0,split[gr][ed];[gr]negate[neg];[neg]gblur=sigma=14[blur];[ed][blur]blend=all_mode=grainextract,eq=contrast=3.5:brightness=0.08,curves=all=\'0/0.08 0.5/0.55 1/0.96\'',
   };
 
   const vf = filters[style] || filters.comic;
