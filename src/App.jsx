@@ -1420,6 +1420,7 @@ function App() {
           handleGoPro={handleGoPro}
           handleCancelPro={handleCancelPro}
           onNavigateHome={() => navigate('/')}
+          onNavigateToTool={(toolId) => { navigate('/'); setSelectedTool(toolId) }}
         />
       ) : (
         <>
