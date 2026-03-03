@@ -1442,9 +1442,15 @@ function App() {
           <p className="hero-sub">
             Compress, resize, and optimize videos and images for WhatsApp, TikTok and Instagram Reels — fast, server-side processing. Instant results. Free.
           </p>
-          <button type="button" className="hero-cta-btn" onClick={goToCompressTool}>
-            Try it Free →
-          </button>
+          {hasProAccess ? (
+            <button type="button" className="hero-cta-btn" onClick={goToCompressTool}>
+              Compress Now →
+            </button>
+          ) : (
+            <button type="button" className="hero-cta-btn" onClick={goToCompressTool}>
+              Try it Free →
+            </button>
+          )}
           <div className="hero-trust">
             <span className="hero-trust-item">
               <svg viewBox="0 0 24 24" fill="currentColor">
