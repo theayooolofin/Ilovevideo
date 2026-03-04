@@ -215,6 +215,7 @@ function App() {
   const [watermarkVideoFile, setWatermarkVideoFile] = useState(null)
   const [watermarkLogoFile, setWatermarkLogoFile] = useState(null)
   const [watermarkPosition, setWatermarkPosition] = useState('bottom-right')
+  const [watermarkSize, setWatermarkSize] = useState('medium')
   const [watermarkProcessing, setWatermarkProcessing] = useState(false)
   const [watermarkResult, setWatermarkResult] = useState(null)
   const [watermarkError, setWatermarkError] = useState('')
@@ -1042,6 +1043,7 @@ function App() {
       formData.append('video', watermarkVideoFile)
       formData.append('logo', watermarkLogoFile)
       formData.append('position', watermarkPosition)
+      formData.append('size', watermarkSize)
       const headers = await getAuthHeaders()
       const response = await fetch(`${API_URL}/api/watermark`, { method: 'POST', body: formData, mode: 'cors', headers })
       if (!response.ok) {
@@ -2630,12 +2632,25 @@ function App() {
                       </div>
                       <div>
                         <span className="field-label">Logo Position</span>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxWidth: '240px' }}>
-                          {[['top-left', '↖ Top Left'], ['top-right', '↗ Top Right'], ['bottom-left', '↙ Bottom Left'], ['bottom-right', '↘ Bottom Right']].map(([pos, label]) => (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {[['top-left', '↖ Top Left'], ['top-right', '↗ Top Right'], ['bottom-left', '↙ Bottom Left'], ['bottom-right', '↘ Bottom Right'], ['center', '⊕ Center']].map(([pos, label]) => (
                             <button key={pos} type="button"
                               onClick={() => setWatermarkPosition(pos)}
-                              style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid', borderColor: watermarkPosition === pos ? '#2563eb' : '#e5e7eb', background: watermarkPosition === pos ? '#eff6ff' : '#fff', color: watermarkPosition === pos ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                              style={{ padding: '8px 10px', borderRadius: '8px', border: '1.5px solid', borderColor: watermarkPosition === pos ? '#2563eb' : '#e5e7eb', background: watermarkPosition === pos ? '#eff6ff' : '#fff', color: watermarkPosition === pos ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer', gridColumn: pos === 'center' ? 'span 2' : undefined }}>
                               {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="field-label">Logo Size</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {[['small', 'Small', '100px'], ['medium', 'Medium', '180px'], ['large', 'Large', '280px']].map(([val, label, hint]) => (
+                            <button key={val} type="button"
+                              onClick={() => setWatermarkSize(val)}
+                              style={{ flex: 1, padding: '10px 8px', borderRadius: '8px', border: '1.5px solid', borderColor: watermarkSize === val ? '#2563eb' : '#e5e7eb', background: watermarkSize === val ? '#eff6ff' : '#fff', cursor: 'pointer', textAlign: 'center' }}>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: watermarkSize === val ? '#2563eb' : '#111827' }}>{label}</div>
+                              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{hint} wide</div>
                             </button>
                           ))}
                         </div>
@@ -2656,7 +2671,7 @@ function App() {
                             <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" /></svg></div>
                             <div className="output-body">
                               <p className="output-title">Watermarked Video Ready</p>
-                              <p className="output-meta">Logo positioned: {watermarkPosition.replace('-', ' ')}</p>
+                              <p className="output-meta">{watermarkPosition.replace(/-/g, ' ')} · {watermarkSize} logo</p>
                               <div className="result-actions">
                                 <a href={watermarkResult.url} download={watermarkResult.fileName} className="download-btn" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 15l-4-4h3V4h2v7h3l-4 4zM4 20h16" strokeLinecap="round" strokeLinejoin="round" /></svg>

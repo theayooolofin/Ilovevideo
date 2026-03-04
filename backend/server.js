@@ -871,13 +871,20 @@ app.post('/api/watermark',
     }
 
     const position = req.body.position || 'bottom-right';
-    const overlayMap = {
-      'top-left': 'overlay=10:10',
-      'top-right': 'overlay=W-w-10:10',
-      'bottom-left': 'overlay=10:H-h-10',
-      'bottom-right': 'overlay=W-w-10:H-h-10',
+    const size = req.body.size || 'medium';
+    const sizeMap = { small: 100, medium: 180, large: 280 };
+    const logoWidth = sizeMap[size] || 180;
+
+    const posMap = {
+      'top-left':     '20:20',
+      'top-right':    'W-w-20:20',
+      'bottom-left':  '20:H-h-20',
+      'bottom-right': 'W-w-20:H-h-20',
+      'center':       '(W-w)/2:(H-h)/2',
     };
-    const overlay = overlayMap[position] || overlayMap['bottom-right'];
+    const overlayExpr = posMap[position] || posMap['bottom-right'];
+    // Scale logo to fixed width (maintains aspect ratio), then overlay
+    const filterComplex = `[1:v]scale=${logoWidth}:-1[logo];[0:v][logo]overlay=${overlayExpr}`;
 
     const videoPath = videoFile.path;
     const logoPath = logoFile.path;
@@ -891,7 +898,8 @@ app.post('/api/watermark',
     };
 
     runProFFmpeg(
-      ['-i', videoPath, '-i', logoPath, '-filter_complex', overlay,
+      ['-i', videoPath, '-i', logoPath,
+       '-filter_complex', filterComplex,
        '-c:a', 'copy', '-movflags', '+faststart', outputPath],
       cleanup, res, req, 'video/mp4', 'ilovevideo-watermarked.mp4'
     );
