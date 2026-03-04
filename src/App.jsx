@@ -16,11 +16,11 @@ const TOOL_CARDS = [
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
   { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true },
   { id: 'resize', name: 'Resize for Social', description: 'Resize videos and images for social formats.', available: true },
+  { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true },
   { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true },
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
-  { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true },
   { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true },
   { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
 ]

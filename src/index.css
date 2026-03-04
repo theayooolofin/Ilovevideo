@@ -1076,6 +1076,40 @@ button, a, input, select, textarea, label {
   transform: translateY(-1px);
 }
 
+/* ── Output card with media preview ─────────────────────────── */
+.output-card.with-preview {
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.output-card.with-preview video,
+.output-card.with-preview audio,
+.output-card.with-preview .preview-gif {
+  width: 100%;
+  display: block;
+}
+.output-card.with-preview video {
+  max-height: 260px;
+  background: #000;
+  object-fit: contain;
+}
+.output-card.with-preview audio {
+  padding: 10px 16px;
+  box-sizing: border-box;
+  background: #ecfdf5;
+}
+.output-card.with-preview .preview-gif {
+  max-height: 220px;
+  object-fit: contain;
+  background: #111;
+}
+.output-card.with-preview .preview-body {
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 @media (max-width: 480px) {
   .output-card {
     flex-direction: column;
@@ -1324,7 +1358,7 @@ button, a, input, select, textarea, label {
     grid-template-columns: 1fr 1fr;
     width: 100%;
     border-radius: 16px;
-    overflow-x: visible;
+    overflow: visible;
     padding: 6px;
     gap: 4px;
   }
