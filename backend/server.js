@@ -137,7 +137,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
+  // No fileSize limit — Nginx controls the ceiling via client_max_body_size
   fileFilter: (req, file, cb) => {
     const allowed = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.3gp'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -150,19 +150,19 @@ const upload = multer({
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
     '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'slower',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
@@ -305,7 +305,6 @@ const runProFFmpeg = (args, cleanupFn, res, req, contentType, filename) => {
 // ── Watermark multer (accepts video + image logo) ────────────────────────────
 const watermarkUpload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const videoExts = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.3gp'];
     const imageExts = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -1032,8 +1031,11 @@ app.use((error, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ iLoveVideo API running on port ${PORT}`);
   console.log(`🎬 Engine: Native FFmpeg`);
   console.log(`💳 Pro tier: ${process.env.PAYSTACK_PUBLIC_KEY ? 'Paystack configured' : 'PAYSTACK keys missing'}`);
 });
+// Allow long-running FFmpeg jobs (2 hours)
+server.timeout = 7200000;
+server.keepAliveTimeout = 7200000;
