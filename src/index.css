@@ -503,12 +503,12 @@ button, a, input, select, textarea, label {
 
 .tool-panel {
   width: 100%;
-  max-width: 780px;
+  max-width: 600px;
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
   border-radius: var(--r-2xl);
   box-shadow: var(--shadow-md);
-  padding: 32px;
+  padding: 28px;
   transition: box-shadow 0.25s ease;
   overflow: hidden;
 }
@@ -783,7 +783,7 @@ button, a, input, select, textarea, label {
 ───────────────────────────────────────── */
 .preset-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
