@@ -774,6 +774,7 @@ function App() {
       const originalSize = parseInt(response.headers.get('X-Original-Size') || '0')
       const compressedSize = parseInt(response.headers.get('X-Compressed-Size') || '0') || null
       const savings = response.headers.get('X-Savings-Percent') || '0'
+      const alreadyOptimized = response.headers.get('X-Already-Optimized') === 'true'
       const blob = await response.blob()
       const downloadUrl = URL.createObjectURL(blob)
 
@@ -782,7 +783,9 @@ function App() {
         url: downloadUrl,
         fileName: `${baseName(selectedFile.name)}-${compressionPreset.id}-compressed.${outputFormat}`,
         sizeBytes: compressedSize,
-        summary: `Preset: ${compressionPreset.label}${savings !== '0' ? ` · ${savings}% smaller` : ''}`,
+        summary: alreadyOptimized
+          ? `This video is already well-compressed — no further reduction possible`
+          : `Preset: ${compressionPreset.label}${savings !== '0' ? ` · ${savings}% smaller` : ''}`,
       })
       setProgress(100)
       posthog.capture('compression_completed', { type: compressMediaType })

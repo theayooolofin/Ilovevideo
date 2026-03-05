@@ -150,19 +150,19 @@ const upload = multer({
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
+    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
+    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
+    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
