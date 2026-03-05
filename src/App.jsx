@@ -393,6 +393,41 @@ function App() {
     return {}
   }
 
+  // XHR upload with real progress: 5%→65% upload, 65%→90% FFmpeg, 90%+ response
+  const sendWithProgress = (url, formData, headers, onPhase) =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.responseType = 'blob'
+      let procInterval = null
+      const stopProc = () => { if (procInterval) { clearInterval(procInterval); procInterval = null } }
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setProgress(5 + Math.round((e.loaded / e.total) * 60))
+      }
+      xhr.upload.onload = () => {
+        setProgress(66)
+        if (onPhase) onPhase('processing')
+        procInterval = setInterval(() => setProgress(p => p >= 90 ? 90 : p + 1), 2000)
+      }
+      xhr.onload = () => {
+        stopProc()
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ blob: xhr.response, header: n => xhr.getResponseHeader(n) })
+        } else {
+          const r = new FileReader()
+          r.onload = () => {
+            try { const d = JSON.parse(r.result); reject(new Error(d.error || `Server error ${xhr.status}`)) }
+            catch { reject(new Error(`Server error ${xhr.status}`)) }
+          }
+          r.readAsText(xhr.response)
+        }
+      }
+      xhr.onerror = () => { stopProc(); reject(new Error('Network error — check your connection')) }
+      xhr.open('POST', url)
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v))
+      xhr.send(formData)
+    })
+
   const fetchUsage = async () => {
     try {
       const headers = await getAuthHeaders()
@@ -741,12 +776,8 @@ function App() {
     setProgress(5)
     setIsProcessing(true)
 
-    let progressInterval = null
     try {
-      setStatusMessage(`Compressing video (${compressionPreset.label})...`)
-      progressInterval = setInterval(() => {
-        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
-      }, 1500)
+      setStatusMessage(`Uploading video...`)
 
       const presetMap = { 'instagram-reel': 'instagram', 'max-quality': 'max-quality' }
       const apiPreset = presetMap[compressionPreset.id] ?? compressionPreset.id
@@ -764,18 +795,16 @@ function App() {
       }
 
       const compressHeaders = await getAuthHeaders()
-      const response = await fetch(`${API_URL}/api/compress`, { method: 'POST', body: formData, mode: 'cors', headers: compressHeaders })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || `Server error: ${response.status}`)
-      }
+      const { blob, header } = await sendWithProgress(
+        `${API_URL}/api/compress`, formData, compressHeaders,
+        (phase) => { if (phase === 'processing') setStatusMessage(`Compressing video (${compressionPreset.label})...`) }
+      )
 
       setProgress(95)
-      const originalSize = parseInt(response.headers.get('X-Original-Size') || '0')
-      const compressedSize = parseInt(response.headers.get('X-Compressed-Size') || '0') || null
-      const savings = response.headers.get('X-Savings-Percent') || '0'
-      const alreadyOptimized = response.headers.get('X-Already-Optimized') === 'true'
-      const blob = await response.blob()
+      const originalSize = parseInt(header('X-Original-Size') || '0')
+      const compressedSize = parseInt(header('X-Compressed-Size') || '0') || null
+      const savings = header('X-Savings-Percent') || '0'
+      const alreadyOptimized = header('X-Already-Optimized') === 'true'
       const downloadUrl = URL.createObjectURL(blob)
 
       const outputFormat = (hasProAccess && advancedMode && advancedFormat) ? advancedFormat : 'mp4'
@@ -798,7 +827,6 @@ function App() {
       setStatusMessage('Compression failed.')
       setProgress(0)
     } finally {
-      if (progressInterval) clearInterval(progressInterval)
       setIsProcessing(false)
     }
   }
@@ -950,26 +978,20 @@ function App() {
     setProgress(5)
     setIsProcessing(true)
 
-    let progressInterval = null
     try {
-      setStatusMessage('Converting to MP4...')
-      progressInterval = setInterval(() => {
-        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
-      }, 1500)
+      setStatusMessage('Uploading video...')
 
       const formData = new FormData()
       formData.append('video', selectedFile)
 
       const convertHeaders = await getAuthHeaders()
-      const response = await fetch(`${API_URL}/api/convert`, { method: 'POST', body: formData, mode: 'cors', headers: convertHeaders })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || `Server error: ${response.status}`)
-      }
+      const { blob, header } = await sendWithProgress(
+        `${API_URL}/api/convert`, formData, convertHeaders,
+        (phase) => { if (phase === 'processing') setStatusMessage('Converting to MP4 with FFmpeg...') }
+      )
 
       setProgress(95)
-      const convertedSize = parseInt(response.headers.get('X-Converted-Size') || '0') || null
-      const blob = await response.blob()
+      const convertedSize = parseInt(header('X-Converted-Size') || '0') || null
       const downloadUrl = URL.createObjectURL(blob)
 
       setResult({
@@ -988,7 +1010,6 @@ function App() {
       setStatusMessage('Conversion failed.')
       setProgress(0)
     } finally {
-      if (progressInterval) clearInterval(progressInterval)
       setIsProcessing(false)
     }
   }
