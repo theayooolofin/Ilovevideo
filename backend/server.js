@@ -1094,6 +1094,11 @@ app.post('/api/split-status', upload.single('video'), async (req, res) => {
     return res.status(403).json({ error: 'PRO_REQUIRED' });
   }
 
+  const allowedDurations = [30, 60, 90];
+  const segmentTime = allowedDurations.includes(parseInt(req.body.segmentTime))
+    ? parseInt(req.body.segmentTime)
+    : 30;
+
   const jobId = `split-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
   const jobDir = path.join(SPLITS_DIR, jobId);
   const inputPath = req.file.path;
@@ -1103,7 +1108,7 @@ app.post('/api/split-status', upload.single('video'), async (req, res) => {
   const args = [
     '-i', inputPath,
     '-f', 'segment',
-    '-segment_time', '28',
+    '-segment_time', segmentTime.toString(),
     '-c', 'copy',
     '-reset_timestamps', '1',
     '-avoid_negative_ts', 'make_zero',

@@ -257,6 +257,7 @@ function App() {
   const [splitProcessing, setSplitProcessing] = useState(false)
   const [splitResult, setSplitResult] = useState(null)
   const [splitError, setSplitError] = useState('')
+  const [splitDuration, setSplitDuration] = useState(30)
 
   // ── Combined processing flag (must be declared before any hook that uses it) ─
   const wakeLockRef = useRef(null)
@@ -1247,6 +1248,7 @@ function App() {
     try {
       const formData = new FormData()
       formData.append('video', splitFile)
+      formData.append('segmentTime', splitDuration.toString())
       const headers = await getAuthHeaders()
       const response = await fetch(`${API_URL}/api/split-status`, { method: 'POST', body: formData, mode: 'cors', headers })
       if (!response.ok) {
@@ -3087,9 +3089,25 @@ function App() {
                           )}
                         </label>
                       </div>
+                      <div>
+                        <span className="field-label">Clip Duration</span>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {[
+                            { value: 30, label: '30s',       desc: 'Standard limit' },
+                            { value: 60, label: '1 min',     desc: 'Some accounts' },
+                            { value: 90, label: '1 min 30s', desc: 'Some accounts' },
+                          ].map(opt => (
+                            <button key={opt.value} type="button" onClick={() => setSplitDuration(opt.value)}
+                              style={{ padding: '10px 16px', borderRadius: '10px', border: '1.5px solid', borderColor: splitDuration === opt.value ? '#2563eb' : '#e5e7eb', background: splitDuration === opt.value ? '#eff6ff' : '#fff', color: splitDuration === opt.value ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
+                              <div>{opt.label}</div>
+                              <div style={{ fontSize: '11px', fontWeight: '400', color: splitDuration === opt.value ? '#3b82f6' : '#9ca3af', marginTop: '2px' }}>{opt.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       {splitFile && !splitResult && (
                         <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                          Video will be cut into 28-second clips — share each one directly to WhatsApp Status.
+                          Video will be cut into {splitDuration < 60 ? `${splitDuration}s` : splitDuration === 60 ? '1-minute' : '1 min 30s'} clips — share each one directly to WhatsApp Status.
                         </p>
                       )}
                       <button type="button" onClick={handleSplitStatus} disabled={!splitFile || splitProcessing} className="action-btn">
