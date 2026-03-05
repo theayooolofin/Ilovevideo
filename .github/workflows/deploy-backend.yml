@@ -1,11 +1,6 @@
 name: Deploy Backend to VPS
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
   workflow_dispatch:
 
 permissions:
