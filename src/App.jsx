@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import posthog from 'posthog-js'
 import StatsBar from './components/StatsBar'
 import ProDashboard from './components/ProDashboard'
+import TourOverlay from './components/TourOverlay'
 import ProBadge from './components/ProBadge'
 import useProStatus from './hooks/useProStatus'
 
@@ -189,6 +190,8 @@ function App() {
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [accountInfo, setAccountInfo] = useState(null)
   const [page, setPage] = useState(() => window.location.pathname === '/pro' ? 'pro' : 'home')
+  const [showTour, setShowTour] = useState(() => !localStorage.getItem('ilv_tour_v1'))
+  const handleTourDone = () => { localStorage.setItem('ilv_tour_v1', '1'); setShowTour(false) }
 
   // Bulk compression
   const [bulkMode, setBulkMode] = useState(false)
@@ -1297,6 +1300,8 @@ function App() {
 
   return (
     <main className="site-shell">
+
+      {showTour && <TourOverlay onDone={handleTourDone} proPrice={proPrice} />}
 
       {showLimitModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -3011,6 +3016,14 @@ function App() {
             <a href="#">Privacy</a>
             <a href="#">Terms</a>
           </div>
+        </div>
+        <div style={{ textAlign: 'center', paddingBottom: '12px' }}>
+          <button
+            onClick={() => setShowTour(true)}
+            style={{ background: 'none', border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: '20px', padding: '6px 16px', color: 'rgba(255,255,255,0.6)', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span style={{ fontSize: '15px' }}>?</span> Take the tour
+          </button>
         </div>
       </footer>
         </>
