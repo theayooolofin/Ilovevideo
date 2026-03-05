@@ -1,31 +1,57 @@
 import posthog from 'posthog-js'
 posthog.init(import.meta.env.VITE_POSTHOG_KEY, { api_host: 'https://app.posthog.com' })
 
-import { StrictMode } from 'react'
+import { StrictMode, Component } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Catch any React crash and show a reload button instead of blank screen
+class ErrorBoundary extends Component {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#f8faff', padding:'24px', textAlign:'center', fontFamily:'sans-serif' }}>
+          <p style={{ fontSize:'18px', color:'#0f172a', marginBottom:'20px' }}>Something went wrong. Please reload the page.</p>
+          <button onClick={() => window.location.reload()} style={{ background:'#2563eb', color:'#fff', border:'none', borderRadius:'8px', padding:'13px 28px', fontSize:'16px', fontWeight:'700', cursor:'pointer' }}>
+            Reload
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(reg => {
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        // hadActiveSW: true = this is an UPDATE to an existing SW
-        // false = first install (no reload needed, page is already loading fresh)
-        const hadActiveSW = !!reg.active;
+      const attachHandlers = (newSW) => {
+        const hadActiveSW = !!reg.active
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'activated' && hadActiveSW) {
-            window.location.reload();
+          // Only skip waiting after page has fully loaded (safe moment)
+          if (newSW.state === 'installed') {
+            newSW.postMessage({ type: 'SKIP_WAITING' })
           }
-        });
-      });
-    });
-  });
+          // Reload only on updates, not on first install
+          if (newSW.state === 'activated' && hadActiveSW) {
+            window.location.reload()
+          }
+        })
+      }
+      // Handle SW already waiting (e.g. user had multiple tabs open)
+      if (reg.waiting) attachHandlers(reg.waiting)
+      reg.addEventListener('updatefound', () => attachHandlers(reg.installing))
+    })
+  })
 }

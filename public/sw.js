@@ -1,10 +1,11 @@
-const CACHE = 'ilovevideo-v3';
+const CACHE = 'ilovevideo-v4';
 
-// Activate new SW immediately — don't wait for old tabs to close
-self.addEventListener('install', () => self.skipWaiting());
+// Only skip waiting when the page explicitly asks — prevents mid-load activation
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 // Clean up old caches on activate
-// No clients.claim() — it can interrupt mid-load on iOS PWA causing blank page
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
