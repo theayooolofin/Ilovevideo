@@ -1,6 +1,9 @@
 const CACHE = 'ilovevideo-v4';
 
-// Only skip waiting when the page explicitly asks — prevents mid-load activation
+// Skip waiting immediately so updates reach all clients (including those running old JS)
+self.addEventListener('install', () => self.skipWaiting());
+
+// Also handle explicit skip requests from new clients
 self.addEventListener('message', e => {
   if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
