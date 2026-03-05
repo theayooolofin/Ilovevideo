@@ -407,7 +407,7 @@ function App() {
       xhr.upload.onload = () => {
         setProgress(66)
         if (onPhase) onPhase('processing')
-        procInterval = setInterval(() => setProgress(p => p >= 90 ? 90 : p + 1), 2000)
+        procInterval = setInterval(() => setProgress(p => p >= 99 ? 99 : p + 1), 3000)
       }
       xhr.onload = () => {
         stopProc()
@@ -846,8 +846,8 @@ function App() {
     try {
       setStatusMessage(`Resizing video for ${resizePreset.label}...`)
       progressInterval = setInterval(() => {
-        setProgress((prev) => (prev >= 90 ? 90 : prev + 2))
-      }, 1500)
+        setProgress((prev) => (prev >= 99 ? 99 : prev + 1))
+      }, 2500)
 
       const formData = new FormData()
       formData.append('video', selectedFile)
@@ -1803,7 +1803,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {progressPercent >= 91 ? `Almost done... ${progressPercent}%` : progressPercent >= 66 ? `Compressing... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
+                          {progressPercent >= 66 ? `Compressing... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -2225,7 +2225,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {progressPercent >= 91 ? `Almost done... ${progressPercent}%` : progressPercent >= 66 ? `Converting... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
+                          {progressPercent >= 66 ? `Converting... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
