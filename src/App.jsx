@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import posthog from 'posthog-js'
 import StatsBar from './components/StatsBar'
@@ -247,6 +247,37 @@ function App() {
   const [removeAudioProcessing, setRemoveAudioProcessing] = useState(false)
   const [removeAudioResult, setRemoveAudioResult] = useState(null)
   const [removeAudioError, setRemoveAudioError] = useState('')
+
+  // ── Wake Lock — keep screen on during processing ────────────────────────────
+  const wakeLockRef = useRef(null)
+  const isAnyProcessing = isProcessing || bulkProcessing || audioProcessing ||
+    gifProcessing || watermarkProcessing || trimProcessing ||
+    speedProcessing || cartoonProcessing || removeAudioProcessing
+
+  useEffect(() => {
+    const acquire = async () => {
+      try {
+        if ('wakeLock' in navigator && !wakeLockRef.current) {
+          wakeLockRef.current = await navigator.wakeLock.request('screen')
+        }
+      } catch {}
+    }
+    const release = () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {})
+        wakeLockRef.current = null
+      }
+    }
+    if (isAnyProcessing) {
+      acquire()
+      // Re-acquire if screen wakes back up while still processing
+      const onVisibility = () => { if (document.visibilityState === 'visible') acquire() }
+      document.addEventListener('visibilitychange', onVisibility)
+      return () => { document.removeEventListener('visibilitychange', onVisibility) }
+    } else {
+      release()
+    }
+  }, [isAnyProcessing])
 
   // Advanced compress settings
   const [advancedMode, setAdvancedMode] = useState(false)
