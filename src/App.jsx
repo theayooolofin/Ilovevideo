@@ -24,6 +24,7 @@ const TOOL_CARDS = [
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
   { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true },
   { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
+  { id: 'status-splitter', name: 'Status Splitter', description: 'Split video into 28s WhatsApp clips.', available: true, pro: true },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -251,11 +252,17 @@ function App() {
   const [removeAudioResult, setRemoveAudioResult] = useState(null)
   const [removeAudioError, setRemoveAudioError] = useState('')
 
+  // Status Splitter
+  const [splitFile, setSplitFile] = useState(null)
+  const [splitProcessing, setSplitProcessing] = useState(false)
+  const [splitResult, setSplitResult] = useState(null)
+  const [splitError, setSplitError] = useState('')
+
   // ── Combined processing flag (must be declared before any hook that uses it) ─
   const wakeLockRef = useRef(null)
   const isAnyProcessing = isProcessing || bulkProcessing || audioProcessing ||
     gifProcessing || watermarkProcessing || trimProcessing ||
-    speedProcessing || cartoonProcessing || removeAudioProcessing
+    speedProcessing || cartoonProcessing || removeAudioProcessing || splitProcessing
 
   // ── Elapsed time counter while any tool is processing ───────────────────────
   const [processingElapsed, setProcessingElapsed] = useState(0)
@@ -1234,6 +1241,74 @@ function App() {
     }
   }
 
+  const handleSplitStatus = async () => {
+    if (!splitFile) { setSplitError('Please select a video file first.'); return }
+    setSplitError(''); setSplitResult(null); setSplitProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', splitFile)
+      const headers = await getAuthHeaders()
+      const response = await fetch(`${API_URL}/api/split-status`, { method: 'POST', body: formData, mode: 'cors', headers })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error === 'PRO_REQUIRED' ? 'Pro required' : errData.error || `Server error ${response.status}`)
+      }
+      const { jobId, count, clips } = await response.json()
+      setSplitProcessing(false)
+      setSplitResult({ jobId, count, clips: clips.map(c => ({ ...c, fetching: true, url: null })) })
+      // Fetch each clip sequentially from the server
+      for (let i = 0; i < clips.length; i++) {
+        try {
+          const clipHeaders = await getAuthHeaders()
+          const clipRes = await fetch(`${API_URL}/api/split-status/${jobId}/clip/${clips[i].index}`, { headers: clipHeaders })
+          if (!clipRes.ok) throw new Error('Failed')
+          const blob = await clipRes.blob()
+          const url = URL.createObjectURL(blob)
+          setSplitResult(prev => {
+            if (!prev) return prev
+            const updated = [...prev.clips]
+            updated[i] = { ...updated[i], fetching: false, url }
+            return { ...prev, clips: updated }
+          })
+        } catch {
+          setSplitResult(prev => {
+            if (!prev) return prev
+            const updated = [...prev.clips]
+            updated[i] = { ...updated[i], fetching: false, url: null, failed: true }
+            return { ...prev, clips: updated }
+          })
+        }
+      }
+      await postStats('video', 0)
+      fetchUsage()
+    } catch (err) {
+      setSplitError(toErrorMessage(err, 'Split failed.'))
+      setSplitProcessing(false)
+    }
+  }
+
+  const handleSplitShare = async (clip, index) => {
+    if (!clip.url) return
+    const fileName = `status-clip-${index + 1}.mp4`
+    try {
+      const blob = await fetch(clip.url).then(r => r.blob())
+      const file = new File([blob], fileName, { type: 'video/mp4' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `WhatsApp Status Clip ${index + 1}` })
+        return
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return
+    }
+    // Fallback: download
+    const a = document.createElement('a')
+    a.href = clip.url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
   const handleDownload = async () => {
     if (!result) return
     try {
@@ -1292,7 +1367,8 @@ function App() {
   const isCartoonTool = selectedTool === 'cartoonify'
   const isRemoveAudioTool = selectedTool === 'remove-audio'
   const isSpeedTool = selectedTool === 'speed'
-  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool || isRemoveAudioTool || isSpeedTool
+  const isSplitTool = selectedTool === 'status-splitter'
+  const activeToolImplemented = isCompressTool || isResizeTool || isConvertTool || isExtractAudioTool || isGifTool || isWatermarkTool || isTrimTool || isCartoonTool || isRemoveAudioTool || isSpeedTool || isSplitTool
 
   const getCompressButtonState = () => {
     if (!selectedFile) return { text: 'Choose a File First', disabled: true }
@@ -2963,6 +3039,104 @@ function App() {
                         <div className="output-card error">
                           <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
                           <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{cartoonError}</p></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── Status Splitter Panel ── */}
+              {isSplitTool && (
+                <>
+                  <div className="panel-header">
+                    <div className="panel-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M8 6H21M8 12H21M8 18H21M3 6h.01M3 12h.01M3 18h.01" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="panel-title">Status Splitter</p>
+                      <p className="panel-desc">Split any video into 28s clips for WhatsApp Status.</p>
+                    </div>
+                  </div>
+                  <div className="panel-divider" />
+                  {!hasProAccess ? (
+                    <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                      <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>Pro Feature</h3>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Upgrade to Pro to split videos for WhatsApp Status.</p>
+                      <button onClick={handleGoPro} style={{ padding: '12px 28px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', fontSize: '15px', fontWeight: '700', color: '#fff', cursor: 'pointer' }}>Go Pro — {proPrice}/mo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="field-label">Upload Video</span>
+                        <label htmlFor="split-input" className={`upload-zone${splitFile ? ' has-file' : ''}`}>
+                          <input id="split-input" type="file" accept="video/*" className="sr-only"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { setSplitFile(f); setSplitResult(null); setSplitError('') }; e.target.value = '' }} />
+                          <div className="upload-icon-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                          {splitFile ? (
+                            <><p className="upload-title" style={{ color: '#065f46' }}>{splitFile.name}</p><p className="upload-hint">{formatBytes(splitFile.size)} · Click to change</p></>
+                          ) : (
+                            <><p className="upload-title"><span className="upload-title-desktop">Drop your video here</span><span className="upload-title-mobile">Tap to upload</span></p><p className="upload-hint">or <span style={{ color: '#6366f1', fontWeight: 700 }}>click to browse</span></p><span className="upload-formats">Supports MP4, MOV, AVI and more</span></>
+                          )}
+                        </label>
+                      </div>
+                      {splitFile && !splitResult && (
+                        <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                          Video will be cut into 28-second clips — share each one directly to WhatsApp Status.
+                        </p>
+                      )}
+                      <button type="button" onClick={handleSplitStatus} disabled={!splitFile || splitProcessing} className="action-btn">
+                        {splitProcessing && <span className="action-spinner" />}
+                        {splitProcessing ? 'Splitting...' : 'Split into 28s Clips →'}
+                      </button>
+                      {splitProcessing && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                          ⚠️ Keep this page open while splitting{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
+                        </div>
+                      )}
+                      {splitResult && (
+                        <div>
+                          <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>
+                            {splitResult.count} clip{splitResult.count !== 1 ? 's' : ''} ready — tap Share to post directly to WhatsApp Status
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {splitResult.clips.map((clip, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '10px', background: clip.url ? '#f0fdf4' : clip.failed ? '#fef2f2' : '#f9fafb', border: '1px solid', borderColor: clip.url ? '#bbf7d0' : clip.failed ? '#fecaca' : '#e5e7eb' }}>
+                                <div style={{ flex: 1 }}>
+                                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 2px' }}>Clip {i + 1}</p>
+                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
+                                    {clip.fetching ? 'Loading...' : clip.failed ? 'Failed to load' : formatBytes(clip.size)}
+                                  </p>
+                                </div>
+                                {clip.fetching && <span className="action-spinner" style={{ flexShrink: 0 }} />}
+                                {clip.url && (
+                                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                    <button type="button" onClick={() => handleSplitShare(clip, i)}
+                                      style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#25D366', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                      📱 Share
+                                    </button>
+                                    <a href={clip.url} download={`status-clip-${i + 1}.mp4`}
+                                      style={{ padding: '8px 14px', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '13px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                      Download
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {splitError && (
+                        <div className="output-card error">
+                          <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
+                          <div className="output-body"><p className="output-title">Error</p><p className="output-meta">{splitError}</p></div>
                         </div>
                       )}
                     </>

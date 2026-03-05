@@ -107,7 +107,8 @@ async function resolveKeyAndLimit(req) {
 // ── File management ──────────────────────────────────────────────────────────
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const OUTPUT_DIR = path.join(__dirname, 'outputs');
-[UPLOAD_DIR, OUTPUT_DIR].forEach(dir => {
+const SPLITS_DIR = path.join(__dirname, 'splits');
+[UPLOAD_DIR, OUTPUT_DIR, SPLITS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -121,6 +122,19 @@ setInterval(() => {
           if (err) return;
           if (Date.now() - stats.mtimeMs > 3600000) fs.unlink(filePath, () => {});
         });
+      });
+    });
+  });
+  // Clean up old split job directories
+  fs.readdir(SPLITS_DIR, (err, entries) => {
+    if (err) return;
+    entries.forEach(entry => {
+      const dirPath = path.join(SPLITS_DIR, entry);
+      fs.stat(dirPath, (err, stats) => {
+        if (err) return;
+        if (stats.isDirectory() && Date.now() - stats.mtimeMs > 3600000) {
+          fs.rm(dirPath, { recursive: true, force: true }, () => {});
+        }
       });
     });
   });
@@ -1068,6 +1082,113 @@ app.post('/api/speed', upload.single('video'), async (req, res) => {
      outputPath],
     cleanup, res, req, 'video/mp4', 'ilovevideo-speed.mp4'
   );
+});
+
+// ── Pro: WhatsApp Status Splitter ────────────────────────────────────────────
+app.post('/api/split-status', upload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(403).json({ error: 'PRO_REQUIRED' });
+  }
+
+  const jobId = `split-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+  const jobDir = path.join(SPLITS_DIR, jobId);
+  const inputPath = req.file.path;
+  fs.mkdirSync(jobDir, { recursive: true });
+
+  const outputPattern = path.join(jobDir, 'clip-%03d.mp4');
+  const args = [
+    '-i', inputPath,
+    '-f', 'segment',
+    '-segment_time', '28',
+    '-c', 'copy',
+    '-reset_timestamps', '1',
+    '-avoid_negative_ts', 'make_zero',
+    outputPattern,
+  ];
+
+  let finished = false;
+  const ffmpeg = spawn('ffmpeg', args);
+  let stderr = '';
+  ffmpeg.stderr.on('data', d => {
+    stderr += d.toString();
+    if (stderr.length > 3000) stderr = stderr.slice(-3000);
+  });
+
+  ffmpeg.on('close', (code) => {
+    finished = true;
+    fs.unlink(inputPath, () => {});
+    if (code !== 0) {
+      fs.rm(jobDir, { recursive: true, force: true }, () => {});
+      if (!res.headersSent) res.status(500).json({ error: 'Split failed', details: stderr.slice(-400) });
+      return;
+    }
+    let files;
+    try {
+      files = fs.readdirSync(jobDir).filter(f => f.startsWith('clip-') && f.endsWith('.mp4')).sort();
+    } catch {
+      if (!res.headersSent) res.status(500).json({ error: 'Failed to read clips' });
+      return;
+    }
+    const clips = files.map((f, i) => {
+      const filePath = path.join(jobDir, f);
+      const stat = fs.statSync(filePath);
+      return { index: i, size: stat.size };
+    });
+    if (clips.length === 0) {
+      fs.rm(jobDir, { recursive: true, force: true }, () => {});
+      if (!res.headersSent) res.status(500).json({ error: 'No clips produced — video may be too short' });
+      return;
+    }
+    if (!res.headersSent) res.json({ jobId, count: clips.length, clips });
+  });
+
+  ffmpeg.on('error', (err) => {
+    finished = true;
+    fs.unlink(inputPath, () => {});
+    fs.rm(jobDir, { recursive: true, force: true }, () => {});
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  });
+
+  req.on('close', () => {
+    if (!finished && !res.headersSent) {
+      ffmpeg.kill('SIGTERM');
+      fs.unlink(inputPath, () => {});
+      fs.rm(jobDir, { recursive: true, force: true }, () => {});
+    }
+  });
+});
+
+app.get('/api/split-status/:jobId/clip/:index', async (req, res) => {
+  const { jobId, index } = req.params;
+
+  // Validate jobId to prevent path traversal
+  if (!/^split-\d+-[a-f0-9]{16}$/.test(jobId)) {
+    return res.status(400).json({ error: 'Invalid job ID' });
+  }
+  const clipIndex = parseInt(index, 10);
+  if (isNaN(clipIndex) || clipIndex < 0 || clipIndex > 999) {
+    return res.status(400).json({ error: 'Invalid clip index' });
+  }
+
+  const { isPro } = await resolveKeyAndLimit(req);
+  if (!isPro) return res.status(403).json({ error: 'PRO_REQUIRED' });
+
+  const clipFile = path.join(SPLITS_DIR, jobId, `clip-${String(clipIndex).padStart(3, '0')}.mp4`);
+  if (!fs.existsSync(clipFile)) {
+    return res.status(404).json({ error: 'Clip not found' });
+  }
+
+  const stat = fs.statSync(clipFile);
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Content-Length', stat.size.toString());
+  res.setHeader('Content-Disposition', `attachment; filename="status-clip-${clipIndex + 1}.mp4"`);
+  res.setHeader('X-Accel-Buffering', 'no');
+  const stream = fs.createReadStream(clipFile);
+  stream.pipe(res);
 });
 
 // ── Error handler ────────────────────────────────────────────────────────────
