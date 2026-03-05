@@ -150,26 +150,26 @@ const upload = multer({
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-crf', '26', '-preset', 'fast',
+    '-c:v', 'libx264', '-crf', '26', '-preset', 'veryfast',
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   // Visually lossless: original resolution, no scaling
   'max-quality': [
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-threads', '0',
   ],
@@ -483,10 +483,13 @@ app.post('/api/convert', upload.single('video'), async (req, res) => {
 
   res.setHeader('Content-Disposition', 'attachment; filename="ilovevideo-converted.mp4"');
 
+  // Copy video stream as-is (fast remux for H.264/H.265 inputs).
+  // Re-encode audio to AAC to ensure compatibility.
+  // This makes MKV/MOV → MP4 nearly instant since no video re-encode.
   const args = [
     '-i', inputPath,
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'medium',
-    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+    '-c:v', 'copy',
+    '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart',
     outputPath,
   ];
