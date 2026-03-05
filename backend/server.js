@@ -189,12 +189,21 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     if (deleteOutput && fs.existsSync(outputPath)) fs.unlink(outputPath, () => {});
   };
 
-  const ffmpeg = spawn('ffmpeg', args);
-  let stderrOutput = '';
+  // Tell Nginx/proxies not to buffer this response — stream directly to client
+  res.setHeader('X-Accel-Buffering', 'no');
 
-  ffmpeg.stderr.on('data', (data) => { stderrOutput += data.toString(); });
+  let finished = false;
+  const ffmpeg = spawn('ffmpeg', args);
+  // Keep only the last 3000 chars of stderr — FFmpeg prints per-frame progress
+  // which can grow to tens of MB for large videos and blow up memory
+  let stderrOutput = '';
+  ffmpeg.stderr.on('data', (data) => {
+    stderrOutput += data.toString();
+    if (stderrOutput.length > 3000) stderrOutput = stderrOutput.slice(-3000);
+  });
 
   ffmpeg.on('close', (code) => {
+    finished = true;
     if (code !== 0) {
       cleanup(true);
       console.error('FFmpeg error:', stderrOutput.slice(-500));
@@ -206,20 +215,22 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
 
     if (!fs.existsSync(outputPath)) {
       cleanup(true);
-      return res.status(500).json({ error: 'Output file not created' });
+      if (!res.headersSent) res.status(500).json({ error: 'Output file not created' });
+      return;
     }
 
     const originalSize = fs.statSync(inputPath).size;
     const outputSize = fs.statSync(outputPath).size;
     const contentType = opts.contentType || 'video/mp4';
 
-    console.log(`Compression result: Input ${originalSize} vs Output ${outputSize}`);
+    console.log(`Compression result: Input ${(originalSize/1048576).toFixed(1)}MB → Output ${(outputSize/1048576).toFixed(1)}MB`);
 
     // Size guard: if output is >= input, return the original file unchanged
     if (opts.sizeGuard && outputSize >= originalSize) {
-      console.log('Output is larger. Keeping original file to preserve quality.');
+      console.log('Output larger than input — returning original.');
       fs.unlink(outputPath, () => {});
       res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', originalSize.toString());
       res.setHeader('X-Original-Size', originalSize.toString());
       res.setHeader('X-Compressed-Size', originalSize.toString());
       res.setHeader('X-Savings-Percent', '0');
@@ -236,6 +247,7 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     const savingsPercent = Math.max(0, Math.round(((originalSize - outputSize) / originalSize) * 100));
 
     res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', outputSize.toString());
     res.setHeader('X-Original-Size', originalSize.toString());
     res.setHeader('X-Compressed-Size', outputSize.toString());
     res.setHeader('X-Savings-Percent', savingsPercent.toString());
@@ -249,6 +261,7 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
   });
 
   ffmpeg.on('error', (err) => {
+    finished = true;
     cleanup(true);
     if (!res.headersSent) {
       if (err.code === 'ENOENT') {
@@ -258,8 +271,10 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
     }
   });
 
+  // Only kill FFmpeg if client disconnects AND processing hasn't finished yet
   req.on('close', () => {
-    if (!res.headersSent) {
+    if (!finished && !res.headersSent) {
+      console.log('Client disconnected — killing FFmpeg process');
       ffmpeg.kill('SIGTERM');
       cleanup(true);
     }
@@ -268,11 +283,17 @@ const runFFmpeg = (args, inputPath, outputPath, res, req, opts = {}) => {
 
 // ── Simple FFmpeg runner for Pro-only endpoints ──────────────────────────────
 const runProFFmpeg = (args, cleanupFn, res, req, contentType, filename) => {
+  res.setHeader('X-Accel-Buffering', 'no');
+  let finished = false;
   const ffmpeg = spawn('ffmpeg', args);
   let stderr = '';
-  ffmpeg.stderr.on('data', (d) => { stderr += d.toString(); });
+  ffmpeg.stderr.on('data', (d) => {
+    stderr += d.toString();
+    if (stderr.length > 3000) stderr = stderr.slice(-3000);
+  });
 
   ffmpeg.on('close', (code) => {
+    finished = true;
     const outputPath = args[args.length - 1];
     if (code !== 0 || !fs.existsSync(outputPath)) {
       cleanupFn();
@@ -284,7 +305,9 @@ const runProFFmpeg = (args, cleanupFn, res, req, contentType, filename) => {
       }
       return;
     }
+    const outputSize = fs.statSync(outputPath).size;
     res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', outputSize.toString());
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     const stream = fs.createReadStream(outputPath);
     stream.pipe(res);
@@ -293,12 +316,17 @@ const runProFFmpeg = (args, cleanupFn, res, req, contentType, filename) => {
   });
 
   ffmpeg.on('error', (err) => {
+    finished = true;
     cleanupFn();
     if (!res.headersSent) res.status(500).json({ error: err.message });
   });
 
   req.on('close', () => {
-    if (!res.headersSent) { ffmpeg.kill('SIGTERM'); cleanupFn(); }
+    if (!finished && !res.headersSent) {
+      console.log('Client disconnected — killing FFmpeg process');
+      ffmpeg.kill('SIGTERM');
+      cleanupFn();
+    }
   });
 };
 
