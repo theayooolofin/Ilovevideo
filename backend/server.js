@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -146,30 +146,46 @@ const upload = multer({
   }
 });
 
+// ── GPU acceleration detection ───────────────────────────────────────────────
+let USE_NVENC = false;
+try {
+  execSync(
+    'ffmpeg -hide_banner -f lavfi -i nullsrc=s=16x16:d=0.1 -frames:v 1 -c:v h264_nvenc -f null -',
+    { stdio: 'pipe', timeout: 10000 }
+  );
+  USE_NVENC = true;
+} catch { /* NVENC unavailable — fall back to CPU libx264 */ }
+
+// Pick GPU or CPU video codec args
+// nvPreset: p1=fastest … p7=slowest/best. p4=balanced, p6=high-quality
+const vc = (cq, cpuPreset = 'fast', nvPreset = 'p4') => USE_NVENC
+  ? ['-c:v', 'h264_nvenc', '-rc', 'vbr', '-cq', String(cq), '-b:v', '0', '-preset', nvPreset]
+  : ['-c:v', 'libx264', '-crf', String(cq), '-preset', cpuPreset];
+
 // ── Compression presets ──────────────────────────────────────────────────────
 const COMPRESS_PRESETS = {
   // Keep original resolution; only downsize if wider than 1280px
   whatsapp: [
-    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
+    ...vc(28, 'veryfast'),
     '-vf', "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   instagram: [
-    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
+    ...vc(28, 'veryfast'),
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   tiktok: [
-    '-c:v', 'libx264', '-crf', '28', '-preset', 'veryfast',
+    ...vc(28, 'veryfast'),
     '-vf', "scale='if(gt(iw,1920),1920,iw)':'if(gt(iw,1920),-2,ih)'",
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '64k',
     '-movflags', '+faststart', '-threads', '0',
   ],
   // Visually lossless: original resolution, no scaling
   'max-quality': [
-    '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
+    ...vc(18, 'fast', 'p6'),
     '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-threads', '0',
   ],
@@ -455,7 +471,7 @@ app.post('/api/resize', upload.single('video'), async (req, res) => {
 
   const args = [
     '-i', inputPath,
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', crf,
+    ...vc(crf),
     '-vf', vf,
     '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart', '-pix_fmt', 'yuv420p', '-threads', '0',
@@ -930,6 +946,7 @@ app.post('/api/watermark',
     runProFFmpeg(
       ['-i', videoPath, '-i', logoPath,
        '-filter_complex', filterComplex,
+       ...vc(23),
        '-c:a', 'copy', '-movflags', '+faststart', outputPath],
       cleanup, res, req, 'video/mp4', 'ilovevideo-watermarked.mp4'
     );
@@ -971,7 +988,7 @@ app.post('/api/cartoonify', upload.single('video'), async (req, res) => {
   runProFFmpeg(
     ['-i', inputPath,
      '-vf', vf,
-     '-c:v', 'libx264', '-crf', '23', '-preset', 'fast',
+     ...vc(23),
      '-map', '0:v', '-map', '0:a?', '-c:a', 'aac', '-b:a', '128k',
      '-movflags', '+faststart', outputPath],
     cleanup, res, req, 'video/mp4', 'ilovevideo-cartoon.mp4'
@@ -1046,7 +1063,7 @@ app.post('/api/speed', upload.single('video'), async (req, res) => {
     ['-i', inputPath,
      '-vf', `setpts=PTS/${speed}`,
      '-af', atempoFilter,
-     '-c:v', 'libx264', '-preset', 'fast', '-crf', '26',
+     ...vc(26),
      '-movflags', '+faststart',
      outputPath],
     cleanup, res, req, 'video/mp4', 'ilovevideo-speed.mp4'
@@ -1064,7 +1081,7 @@ app.use((error, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ iLoveVideo API running on port ${PORT}`);
-  console.log(`🎬 Engine: Native FFmpeg`);
+  console.log(`🎬 Engine: ${USE_NVENC ? 'FFmpeg + h264_nvenc (GPU)' : 'FFmpeg libx264 (CPU)'}`);
   console.log(`💳 Pro tier: ${process.env.PAYSTACK_PUBLIC_KEY ? 'Paystack configured' : 'PAYSTACK keys missing'}`);
 });
 // Allow long-running FFmpeg jobs (2 hours)
