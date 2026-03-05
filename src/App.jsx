@@ -251,6 +251,15 @@ function App() {
   const [removeAudioResult, setRemoveAudioResult] = useState(null)
   const [removeAudioError, setRemoveAudioError] = useState('')
 
+  // ── Elapsed time counter while any tool is processing ───────────────────────
+  const [processingElapsed, setProcessingElapsed] = useState(0)
+  useEffect(() => {
+    if (!isAnyProcessing) { setProcessingElapsed(0); return }
+    const t = setInterval(() => setProcessingElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [isAnyProcessing])
+  const fmtElapsed = s => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
+
   // ── Wake Lock — keep screen on during processing ────────────────────────────
   const wakeLockRef = useRef(null)
   const isAnyProcessing = isProcessing || bulkProcessing || audioProcessing ||
@@ -1896,7 +1905,7 @@ function App() {
                   {/* Keep screen on banner */}
                   {isProcessing && selectedFile && isVideoFile(selectedFile) && (
                     <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                      ⚠️ Keep this page open and your screen on during compression
+                      ⚠️ Keep this page open and your screen on during compression{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                     </div>
                   )}
 
@@ -2087,7 +2096,7 @@ function App() {
                   {/* Keep screen on banner */}
                   {isProcessing && selectedFile && isVideoFile(selectedFile) && (
                     <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                      ⚠️ Keep this page open and your screen on during compression
+                      ⚠️ Keep this page open and your screen on during resizing{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                     </div>
                   )}
 
@@ -2218,7 +2227,7 @@ function App() {
                   {/* Keep screen on banner */}
                   {isProcessing && (
                     <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                      ⚠️ Keep this page open and your screen on during conversion
+                      ⚠️ Keep this page open and your screen on during conversion{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                     </div>
                   )}
 
@@ -2312,7 +2321,7 @@ function App() {
                       </button>
                       {audioProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open during extraction
+                          ⚠️ Keep this page open during extraction{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {audioResult && (
@@ -2421,7 +2430,7 @@ function App() {
                       </button>
                       {gifProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open during processing
+                          ⚠️ Keep this page open during GIF creation{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {gifResult && (
@@ -2490,6 +2499,11 @@ function App() {
                     {removeAudioProcessing && <span className="action-spinner" />}
                     {removeAudioProcessing ? 'Removing Audio...' : 'Remove Audio →'}
                   </button>
+                  {removeAudioProcessing && (
+                    <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
+                      ⚠️ Keep this page open during processing{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
+                    </div>
+                  )}
                   {removeAudioResult && (
                     <div className="output-card success with-preview">
                       <video src={removeAudioResult.url} controls preload="metadata" />
@@ -2585,7 +2599,7 @@ function App() {
                       </button>
                       {trimProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open during processing
+                          ⚠️ Keep this page open during trimming{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {trimResult && (
@@ -2697,7 +2711,7 @@ function App() {
                       </button>
                       {watermarkProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open during processing
+                          ⚠️ Keep this page open during watermarking{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {watermarkResult && (
@@ -2806,7 +2820,7 @@ function App() {
                       </button>
                       {speedProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open during processing
+                          ⚠️ Keep this page open during speed change{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {speedResult && (
@@ -2901,7 +2915,7 @@ function App() {
                       </button>
                       {cartoonProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
-                          ⚠️ Keep this page open — long videos may take several minutes
+                          ⚠️ Keep this page open — long videos may take several minutes{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
                       {cartoonResult && (
