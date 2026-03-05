@@ -1803,7 +1803,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {`Uploading... ${progressPercent}%`}
+                          {progressPercent >= 91 ? `Almost done... ${progressPercent}%` : progressPercent >= 66 ? `Compressing... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -2225,7 +2225,7 @@ function App() {
                     {isProcessing && (
                       <div className="progress-wrap">
                         <p className="progress-live-label">
-                          {`Converting... ${progressPercent}%`}
+                          {progressPercent >= 91 ? `Almost done... ${progressPercent}%` : progressPercent >= 66 ? `Converting... ${progressPercent}%` : `Uploading... ${progressPercent}%`}
                         </p>
                         <div className="progress-track">
                           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
