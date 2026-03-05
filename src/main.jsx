@@ -15,19 +15,17 @@ createRoot(document.getElementById('root')).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(reg => {
-      // When a new SW is installed and waiting, reload to activate it
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
+        // hadActiveSW: true = this is an UPDATE to an existing SW
+        // false = first install (no reload needed, page is already loading fresh)
+        const hadActiveSW = !!reg.active;
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+          if (newSW.state === 'activated' && hadActiveSW) {
             window.location.reload();
           }
         });
       });
-    });
-    // If the controller changes (new SW took over), reload
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
     });
   });
 }
