@@ -3059,7 +3059,7 @@ function App() {
                     </div>
                     <div>
                       <p className="panel-title">Status Splitter</p>
-                      <p className="panel-desc">Split any video into 28s clips for WhatsApp Status.</p>
+                      <p className="panel-desc">Cut any video into clips ready for WhatsApp Status.</p>
                     </div>
                   </div>
                   <div className="panel-divider" />
@@ -3072,6 +3072,27 @@ function App() {
                     </div>
                   ) : (
                     <>
+                      {/* Clip Duration — compact segmented control */}
+                      <div>
+                        <span className="field-label">Clip Duration</span>
+                        <div style={{ display: 'inline-flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                          {[
+                            { value: 30, label: '30s' },
+                            { value: 60, label: '1 min' },
+                            { value: 90, label: '1m 30s' },
+                          ].map(opt => (
+                            <button key={opt.value} type="button" onClick={() => setSplitDuration(opt.value)}
+                              style={{ padding: '7px 18px', borderRadius: '8px', border: 'none', background: splitDuration === opt.value ? '#fff' : 'transparent', color: splitDuration === opt.value ? '#111827' : '#6b7280', fontSize: '13px', fontWeight: splitDuration === opt.value ? '700' : '500', cursor: 'pointer', boxShadow: splitDuration === opt.value ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '5px', marginBottom: 0 }}>
+                          {splitDuration === 30 ? 'Works for all accounts' : 'Only if your WhatsApp supports this length'}
+                        </p>
+                      </div>
+
+                      {/* Upload */}
                       <div>
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="split-input" className={`upload-zone${splitFile ? ' has-file' : ''}`}>
@@ -3089,59 +3110,42 @@ function App() {
                           )}
                         </label>
                       </div>
-                      <div>
-                        <span className="field-label">Clip Duration</span>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {[
-                            { value: 30, label: '30s',       desc: 'Standard limit' },
-                            { value: 60, label: '1 min',     desc: 'Some accounts' },
-                            { value: 90, label: '1 min 30s', desc: 'Some accounts' },
-                          ].map(opt => (
-                            <button key={opt.value} type="button" onClick={() => setSplitDuration(opt.value)}
-                              style={{ padding: '10px 16px', borderRadius: '10px', border: '1.5px solid', borderColor: splitDuration === opt.value ? '#2563eb' : '#e5e7eb', background: splitDuration === opt.value ? '#eff6ff' : '#fff', color: splitDuration === opt.value ? '#2563eb' : '#374151', fontSize: '13px', fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
-                              <div>{opt.label}</div>
-                              <div style={{ fontSize: '11px', fontWeight: '400', color: splitDuration === opt.value ? '#3b82f6' : '#9ca3af', marginTop: '2px' }}>{opt.desc}</div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {splitFile && !splitResult && (
-                        <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                          Video will be cut into {splitDuration < 60 ? `${splitDuration}s` : splitDuration === 60 ? '1-minute' : '1 min 30s'} clips — share each one directly to WhatsApp Status.
-                        </p>
-                      )}
+
                       <button type="button" onClick={handleSplitStatus} disabled={!splitFile || splitProcessing} className="action-btn">
                         {splitProcessing && <span className="action-spinner" />}
-                        {splitProcessing ? 'Splitting...' : 'Split into 28s Clips →'}
+                        {splitProcessing ? 'Splitting...' : `Split into ${splitDuration < 60 ? splitDuration + 's' : splitDuration === 60 ? '1-min' : '1m 30s'} Clips →`}
                       </button>
+
                       {splitProcessing && (
                         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '500', color: '#92400e' }}>
                           ⚠️ Keep this page open while splitting{processingElapsed > 0 ? ` · ${fmtElapsed(processingElapsed)}` : ''}
                         </div>
                       )}
+
                       {splitResult && (
                         <div>
-                          <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>
-                            {splitResult.count} clip{splitResult.count !== 1 ? 's' : ''} ready — tap Share to post directly to WhatsApp Status
+                          <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '10px' }}>
+                            {splitResult.count} clip{splitResult.count !== 1 ? 's' : ''} — tap Share to post directly to WhatsApp Status
                           </p>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
                             {splitResult.clips.map((clip, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '10px', background: clip.url ? '#f0fdf4' : clip.failed ? '#fef2f2' : '#f9fafb', border: '1px solid', borderColor: clip.url ? '#bbf7d0' : clip.failed ? '#fecaca' : '#e5e7eb' }}>
-                                <div style={{ flex: 1 }}>
-                                  <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 2px' }}>Clip {i + 1}</p>
-                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
-                                    {clip.fetching ? 'Loading...' : clip.failed ? 'Failed to load' : formatBytes(clip.size)}
-                                  </p>
+                              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', borderRadius: '10px', background: clip.url ? '#f0fdf4' : clip.failed ? '#fef2f2' : '#f9fafb', border: '1px solid', borderColor: clip.url ? '#bbf7d0' : clip.failed ? '#fecaca' : '#e5e7eb' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: clip.url ? '#dcfce7' : clip.failed ? '#fee2e2' : '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: clip.url ? '#15803d' : clip.failed ? '#b91c1c' : '#6b7280', flexShrink: 0 }}>{i + 1}</div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827', margin: 0 }}>Clip {i + 1}</p>
+                                    <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{clip.fetching ? 'Loading...' : clip.failed ? 'Failed' : formatBytes(clip.size)}</p>
+                                  </div>
+                                  {clip.fetching && <span className="action-spinner" style={{ flexShrink: 0 }} />}
                                 </div>
-                                {clip.fetching && <span className="action-spinner" style={{ flexShrink: 0 }} />}
                                 {clip.url && (
-                                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                  <div style={{ display: 'flex', gap: '6px' }}>
                                     <button type="button" onClick={() => handleSplitShare(clip, i)}
-                                      style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: '#25D366', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                      style={{ flex: 1, padding: '8px 0', borderRadius: '8px', border: 'none', background: '#25D366', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                                       📱 Share
                                     </button>
                                     <a href={clip.url} download={`status-clip-${i + 1}.mp4`}
-                                      style={{ padding: '8px 14px', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '13px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                      style={{ flex: 1, padding: '8px 0', borderRadius: '8px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: '13px', fontWeight: '600', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       Download
                                     </a>
                                   </div>
@@ -3151,6 +3155,7 @@ function App() {
                           </div>
                         </div>
                       )}
+
                       {splitError && (
                         <div className="output-card error">
                           <div className="output-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" /></svg></div>
