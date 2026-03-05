@@ -251,6 +251,12 @@ function App() {
   const [removeAudioResult, setRemoveAudioResult] = useState(null)
   const [removeAudioError, setRemoveAudioError] = useState('')
 
+  // ── Combined processing flag (must be declared before any hook that uses it) ─
+  const wakeLockRef = useRef(null)
+  const isAnyProcessing = isProcessing || bulkProcessing || audioProcessing ||
+    gifProcessing || watermarkProcessing || trimProcessing ||
+    speedProcessing || cartoonProcessing || removeAudioProcessing
+
   // ── Elapsed time counter while any tool is processing ───────────────────────
   const [processingElapsed, setProcessingElapsed] = useState(0)
   useEffect(() => {
@@ -261,10 +267,6 @@ function App() {
   const fmtElapsed = s => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 
   // ── Wake Lock — keep screen on during processing ────────────────────────────
-  const wakeLockRef = useRef(null)
-  const isAnyProcessing = isProcessing || bulkProcessing || audioProcessing ||
-    gifProcessing || watermarkProcessing || trimProcessing ||
-    speedProcessing || cartoonProcessing || removeAudioProcessing
 
   useEffect(() => {
     const acquire = async () => {
