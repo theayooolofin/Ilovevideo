@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Film, Layers, Maximize2, Minimize2, Music, RefreshCcw, Scissors, SplitSquareVertical, VolumeX, Wand2, Zap } from 'lucide-react'
+import { Film, Frame, Layers, Maximize2, Minimize2, Music, RefreshCcw, Scissors, SplitSquareVertical, VolumeX, Wand2, Zap } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import posthog from 'posthog-js'
 import StatsBar from './components/StatsBar'
@@ -26,6 +26,7 @@ const TOOL_CARDS = [
   { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true, icon: Zap },
   { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false, icon: Wand2 },
   { id: 'status-splitter', name: 'Status Splitter', description: 'Split video into 28s WhatsApp clips.', available: true, pro: true, icon: SplitSquareVertical },
+  { id: 'frame-generator', name: 'Frame Generator', description: 'Create marketplace listing frames.', available: true, external: true, icon: Frame },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -1708,6 +1709,7 @@ function App() {
                 type="button"
                 onClick={() => {
                   if (isSoon) return
+                  if (tool.external) { window.open(`/${tool.id}.html`, '_blank'); return }
                   if (isLocked) {
                     if (user) setShowLimitModal(true)
                     else { setAuthMode('signup'); setAuthError(''); setShowAuthModal(true) }
