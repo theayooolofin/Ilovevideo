@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Film, Layers, Maximize2, Minimize2, Music, RefreshCcw, Scissors, SplitSquareVertical, VolumeX, Wand2, Zap } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import posthog from 'posthog-js'
 import StatsBar from './components/StatsBar'
@@ -14,17 +15,17 @@ const FREE_LIMIT = 3
 const USER_LIMIT = 10
 
 const TOOL_CARDS = [
-  { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true },
-  { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true },
-  { id: 'resize', name: 'Resize for Social', description: 'Resize videos and images for social formats.', available: true },
-  { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true },
-  { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true },
-  { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true },
-  { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true },
-  { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true },
-  { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true },
-  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false },
-  { id: 'status-splitter', name: 'Status Splitter', description: 'Split video into 28s WhatsApp clips.', available: true, pro: true },
+  { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true, icon: Minimize2 },
+  { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true, icon: RefreshCcw },
+  { id: 'resize', name: 'Resize for Social', description: 'Resize videos and images for social formats.', available: true, icon: Maximize2 },
+  { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true, icon: VolumeX },
+  { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true, icon: Music },
+  { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true, icon: Film },
+  { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true, icon: Layers },
+  { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true, icon: Scissors },
+  { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true, icon: Zap },
+  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false, icon: Wand2 },
+  { id: 'status-splitter', name: 'Status Splitter', description: 'Split video into 28s WhatsApp clips.', available: true, pro: true, icon: SplitSquareVertical },
 ]
 
 const COMPRESSION_PRESETS = [
@@ -1718,10 +1719,11 @@ function App() {
                 disabled={isSoon}
                 className={`pill-tab${isActive ? ' active' : ''}${isSoon ? ' soon' : ''}`}
               >
-                {isLocked && <span style={{ marginRight: '4px', fontSize: '11px' }}>🔒</span>}
+                {tool.icon && <tool.icon size={14} strokeWidth={2.2} style={{ flexShrink: 0 }} />}
+                {isLocked && <span style={{ fontSize: '11px' }}>🔒</span>}
                 {tool.name}
                 {isSoon && <span className="soon-badge">Soon</span>}
-                {isProTool && !isSoon && <span style={{ marginLeft: '5px', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '999px', verticalAlign: 'middle', letterSpacing: '0.02em' }}>PRO</span>}
+                {isProTool && !isSoon && <span style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '999px', letterSpacing: '0.02em' }}>PRO</span>}
               </button>
             )
           })}

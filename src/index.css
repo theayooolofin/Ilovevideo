@@ -435,38 +435,38 @@ button, a, input, select, textarea, label {
   margin-bottom: 32px;
 }
 
+/* Desktop: wrap into rows — no scrollbar */
 .tabs-shell {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  background: var(--clr-surface);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--r-full);
-  box-shadow: var(--shadow-sm);
-  padding: 5px;
-  overflow-x: auto;
-  max-width: 100%;
-  scrollbar-width: none;
+  justify-content: center;
+  gap: 8px;
+  max-width: 700px;
+  overflow: visible;
 }
 
-.tabs-shell::-webkit-scrollbar { display: none; }
-
 .pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   border-radius: var(--r-full);
-  background: transparent;
+  background: #f3f4f6;
   color: var(--clr-muted);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 9px 20px;
+  padding: 9px 18px;
+  height: 38px;
   white-space: nowrap;
   cursor: pointer;
   flex-shrink: 0;
+  transition: background 0.14s, color 0.14s, box-shadow 0.14s;
 }
 
 .pill-tab:hover:not(:disabled) {
+  background: #e5e7eb;
   color: var(--clr-text);
-  background: rgba(79,70,229,0.07);
 }
 
 .pill-tab.active {
@@ -477,7 +477,7 @@ button, a, input, select, textarea, label {
 
 .pill-tab.soon {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .soon-badge {
@@ -1349,27 +1349,33 @@ button, a, input, select, textarea, label {
   }
 
   .tabs-wrap {
-    padding: 0 16px;
+    padding: 0 12px;
     justify-content: stretch;
   }
 
+  /* Mobile: single horizontal scroll row (touch-friendly) */
   .tabs-shell {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
     width: 100%;
-    border-radius: 16px;
-    overflow: visible;
-    padding: 6px;
-    gap: 4px;
+    max-width: 100%;
+    overflow-x: auto;
+    gap: 6px;
+    scrollbar-width: none;
+    padding: 4px 2px;
   }
 
+  .tabs-shell::-webkit-scrollbar { display: none; }
+
   .pill-tab {
-    border-radius: 10px;
-    padding: 10px 8px;
-    font-size: 12px;
-    white-space: normal;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    height: 34px;
+    white-space: nowrap;
+    flex-shrink: 0;
     text-align: center;
-    line-height: 1.35;
   }
 
   .panel-wrap {
