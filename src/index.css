@@ -1350,23 +1350,19 @@ button, a, input, select, textarea, label {
 
   .tabs-wrap {
     padding: 0 12px;
-    justify-content: stretch;
+    justify-content: center;
   }
 
-  /* Mobile: single horizontal scroll row (touch-friendly) */
+  /* Mobile: wrap into rows, all tools visible */
   .tabs-shell {
     display: flex;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow: visible;
     gap: 6px;
-    scrollbar-width: none;
-    padding: 4px 2px;
   }
-
-  .tabs-shell::-webkit-scrollbar { display: none; }
 
   .pill-tab {
     border-radius: 999px;
