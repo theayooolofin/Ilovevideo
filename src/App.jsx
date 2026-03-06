@@ -15,18 +15,21 @@ const FREE_LIMIT = 3
 const USER_LIMIT = 10
 
 const TOOL_CARDS = [
+  // ── Free ──
   { id: 'compress', name: 'Compress Video', description: 'Shrink file size fast.', available: true, icon: Minimize2 },
   { id: 'convert', name: 'Convert to MP4', description: 'MOV, MKV, AVI → MP4.', available: true, icon: RefreshCcw },
   { id: 'resize', name: 'Resize for Social', description: 'Resize videos and images for social formats.', available: true, icon: Maximize2 },
   { id: 'remove-audio', name: 'Remove Audio', description: 'Mute any video instantly.', available: true, icon: VolumeX },
+  { id: 'frame-generator', name: 'Sell Post', description: 'Turn product photos into ready-to-post listing cards.', available: true, external: true, icon: Frame },
+  // ── Pro ──
   { id: 'extract-audio', name: 'Extract Audio', description: 'Pull MP3 from any video.', available: true, pro: true, icon: Music },
   { id: 'gif', name: 'GIF Maker', description: 'Turn clips into animated GIFs.', available: true, pro: true, icon: Film },
   { id: 'watermark', name: 'Watermark', description: 'Brand videos with your logo.', available: true, pro: true, icon: Layers },
   { id: 'trim', name: 'Trim Video', description: 'Cut clips precisely.', available: true, pro: true, icon: Scissors },
   { id: 'speed', name: 'Speed Change', description: 'Slow motion or speed up.', available: true, pro: true, icon: Zap },
-  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false, icon: Wand2 },
   { id: 'status-splitter', name: 'Status Splitter', description: 'Split video into 28s WhatsApp clips.', available: true, pro: true, icon: SplitSquareVertical },
-  { id: 'frame-generator', name: 'Sell Post', description: 'Turn product photos into ready-to-post listing cards.', available: true, external: true, icon: Frame },
+  // ── Soon ──
+  { id: 'cartoonify', name: 'Video to Cartoon', description: 'Give videos an animated look.', available: false, icon: Wand2 },
 ]
 
 const COMPRESSION_PRESETS = [
