@@ -9,642 +9,662 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --gold: #C9A84C;
-      --gold-light: #E8C96A;
-      --ink: #111111;
-      --muted: #6B7280;
-      --border: #E5E4E0;
-      --surface: #FFFFFF;
-      --bg: #F7F6F3;
-      --radius: 4px;
+      --ink: #111111; --muted: #6B7280; --border: #E5E4E0;
+      --surface: #FFFFFF; --bg: #F7F6F3; --r: 4px;
     }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
     /* ── Nav ── */
-    nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
     nav a { text-decoration: none; color: var(--ink); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
     nav a:hover { color: var(--muted); }
-    .nav-brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-    .nav-arrow { font-size: 14px; color: var(--muted); }
+    .nav-brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
 
     /* ── Page header ── */
-    .page-header {
-      padding: 48px 32px 32px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .page-header h1 {
-      font-family: 'Playfair Display', serif;
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
-      margin-bottom: 6px;
-    }
-    .page-header p { font-size: 14px; color: var(--muted); font-weight: 400; }
+    .page-header { padding: 40px 32px 28px; max-width: 1200px; margin: 0 auto; }
+    .page-header h1 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 5px; }
+    .page-header p { font-size: 13.5px; color: var(--muted); }
 
     /* ── Main grid ── */
-    .main-grid {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 32px 64px;
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      gap: 40px;
-      align-items: start;
-    }
+    .main-grid { max-width: 1200px; margin: 0 auto; padding: 0 32px 64px; display: grid; grid-template-columns: 400px 1fr; gap: 40px; align-items: start; }
 
-    /* ── Controls panel ── */
-    .controls { display: flex; flex-direction: column; gap: 28px; }
-
+    /* ── Controls ── */
+    .controls { display: flex; flex-direction: column; gap: 24px; }
     .field-group { display: flex; flex-direction: column; gap: 6px; }
-    .field-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .field-input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      font-family: 'Inter', sans-serif;
-      font-size: 15px;
-      font-weight: 500;
-      color: var(--ink);
-      background: var(--surface);
-      outline: none;
-      transition: border-color 0.15s;
-    }
+    .field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .field-input { width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r); font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500; color: var(--ink); background: var(--surface); outline: none; transition: border-color 0.14s; }
     .field-input:focus { border-color: var(--ink); }
     .field-input::placeholder { color: #C0BFB8; font-weight: 400; }
+    .divider { height: 1px; background: var(--border); }
 
     /* ── Drop zone ── */
-    .drop-zone {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border: 1.5px dashed var(--border);
-      border-radius: var(--radius);
-      background: var(--surface);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      position: relative;
-      overflow: hidden;
-    }
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: var(--ink);
-      background: #F2F1EE;
-    }
+    .drop-zone { width: 100%; aspect-ratio: 1/1; border: 1.5px dashed var(--border); border-radius: var(--r); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: border-color 0.14s, background 0.14s; position: relative; overflow: hidden; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--ink); background: #F2F1EE; }
     .drop-zone.has-image { border-style: solid; border-color: var(--ink); }
-    .drop-zone img.thumb {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      object-fit: cover; opacity: 0.85;
-    }
-    .drop-zone-label {
-      position: relative; z-index: 1;
-      text-align: center; pointer-events: none;
-    }
+    .drop-zone img.thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.82; }
+    .drop-zone-label { position: relative; z-index: 1; text-align: center; pointer-events: none; }
     .drop-zone.has-image .drop-zone-label { display: none; }
-    .drop-zone-icon { font-size: 28px; margin-bottom: 4px; }
+    .drop-zone-icon { font-size: 26px; margin-bottom: 4px; }
     .drop-zone-text { font-size: 13px; font-weight: 500; color: var(--muted); }
     .drop-zone-sub { font-size: 11px; color: #B0AFA9; margin-top: 2px; }
-    .drop-zone-change {
-      position: absolute; bottom: 10px; right: 10px; z-index: 2;
-      background: rgba(0,0,0,0.65); color: #fff;
-      font-size: 11px; font-weight: 500; padding: 4px 10px;
-      border-radius: 2px; display: none;
-    }
-    .drop-zone.has-image .drop-zone-change { display: block; }
+    .drop-change { position: absolute; bottom: 8px; right: 8px; z-index: 2; background: rgba(0,0,0,0.62); color: #fff; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 2px; display: none; }
+    .drop-zone.has-image .drop-change { display: block; }
 
-    /* ── Frame style selector ── */
-    .frame-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-
-    .frame-card {
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius);
-      padding: 10px 6px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface);
-      transition: border-color 0.15s, background 0.15s;
-      user-select: none;
-    }
+    /* ── Frame selector ── */
+    .frame-scroll { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+    .frame-card { border: 1.5px solid var(--border); border-radius: var(--r); padding: 8px 5px 7px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--surface); transition: border-color 0.13s; user-select: none; }
     .frame-card:hover { border-color: #999; }
-    .frame-card.active { border-color: var(--ink); background: #F2F1EE; }
+    .frame-card.active { border-color: var(--ink); background: #F0EFEC; }
+    .frame-name { font-size: 10px; font-weight: 500; text-align: center; line-height: 1.3; color: var(--ink); }
 
-    /* Mini frame preview thumbnails */
-    .frame-thumb {
-      width: 52px;
-      height: 65px;
-      border-radius: 2px;
-      overflow: hidden;
-      position: relative;
-      flex-shrink: 0;
-    }
-    /* Gold */
-    .frame-thumb-gold {
-      background: #0d0d0d;
-      outline: 1.5px solid #C9A84C;
-      outline-offset: -4px;
-    }
-    .frame-thumb-gold::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 18px;
-      background: linear-gradient(to top, rgba(201,168,76,0.18), transparent);
-    }
-    /* Black */
-    .frame-thumb-black { background: #f0eeea; }
-    .frame-thumb-black::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0; height: 22px;
-      background: #000;
-    }
-    /* White */
-    .frame-thumb-white { background: #fff; outline: 1.5px solid #e5e4e0; }
-    .frame-thumb-white::before {
-      content: '';
-      position: absolute;
-      inset: 5px 5px 16px 5px;
-      background: #d9d7d2;
-      border-radius: 1px;
-    }
+    /* ── Frame mini thumbnails ── */
+    .fthumb { width: 52px; height: 65px; border-radius: 2px; overflow: hidden; position: relative; flex-shrink: 0; }
+    .fthumb-img { position: absolute; inset: 4px 4px 17px 4px; border-radius: 1px; }
+    .fthumb-bar { position: absolute; bottom: 0; left: 0; right: 0; }
 
-    .frame-name { font-size: 11px; font-weight: 500; color: var(--ink); text-align: center; line-height: 1.3; }
+    /* 1. Gold Noir */ .ft-gold-noir { background: #080706; } .ft-gold-noir .fthumb-img { border: 1px solid #C9A84C; background: rgba(201,168,76,0.1); } .ft-gold-noir .fthumb-bar { height: 14px; background: rgba(201,168,76,0.18); }
+    /* 2. Pearl White */ .ft-pearl { background: #F8F7F3; outline: 1px solid #E0DEDB; } .ft-pearl .fthumb-img { border: 1px solid #D8D6D0; background: #DDD; } .ft-pearl .fthumb-bar { height: 16px; background: #F8F7F3; border-top: 1px solid #E0DEDB; }
+    /* 3. Midnight */ .ft-midnight { background: #111; } .ft-midnight .fthumb-img { inset: 0 0 16px; border-radius: 0; background: #444; border: none; } .ft-midnight .fthumb-bar { height: 16px; background: #000; }
+    /* 4. Rose Petal */ .ft-rose { background: #130A09; } .ft-rose .fthumb-img { border: 1px solid #C47A6A; background: rgba(196,122,106,0.1); } .ft-rose .fthumb-bar { height: 14px; background: rgba(196,122,106,0.2); }
+    /* 5. Royal Purple */ .ft-purple { background: #0C0815; } .ft-purple .fthumb-img { inset: 0 0 16px; border-radius: 0; background: #2A1A45; border: none; } .ft-purple .fthumb-bar { height: 16px; background: #0C0815; }
+    /* 6. Deep Ocean */ .ft-ocean { background: #051828; } .ft-ocean .fthumb-img { inset: 0 0 16px; border-radius: 0; background: #1A3050; border: none; } .ft-ocean .fthumb-bar { height: 16px; background: #051828; border-top: 1px solid #1E4080; }
+    /* 7. Emerald */ .ft-emerald { background: #060F08; } .ft-emerald .fthumb-img { border: 1px solid #10B981; background: rgba(16,185,129,0.08); } .ft-emerald .fthumb-bar { height: 14px; background: rgba(110,231,183,0.1); }
+    /* 8. Crimson */ .ft-crimson { background: #0F0205; } .ft-crimson .fthumb-img { inset: 0 0 16px; border-radius: 0; background: #3A0A10; border: none; } .ft-crimson .fthumb-bar { height: 16px; background: #0F0205; }
+    /* 9. Sunset */ .ft-sunset { background: #100800; } .ft-sunset .fthumb-img { border: 1px solid #F59E0B; background: rgba(245,158,11,0.1); } .ft-sunset .fthumb-bar { height: 14px; background: rgba(252,211,77,0.15); }
+    /* 10. Silver Chrome */ .ft-silver { background: #F0EEE8; outline: 1px solid #DDD; } .ft-silver .fthumb-img { border: 1px solid #C8C6C0; background: #D8D6D0; } .ft-silver .fthumb-bar { height: 16px; background: #F0EEE8; }
+    /* 11. Forest */ .ft-forest { background: #060C06; } .ft-forest .fthumb-img { border: 1px solid #4A7A35; background: rgba(74,122,53,0.1); box-shadow: inset 0 0 0 2px #060C06; } .ft-forest .fthumb-bar { height: 14px; background: rgba(163,201,138,0.12); }
+    /* 12. Neon Pink */ .ft-neon { background: #08070F; } .ft-neon .fthumb-img { inset: 0 0 16px; border-radius: 0; background: #1A1030; border: none; } .ft-neon .fthumb-bar { height: 16px; background: #08070F; border-top: 1px solid #FF69B4; }
 
-    /* ── Preview panel ── */
-    .preview-panel { display: flex; flex-direction: column; align-items: center; gap: 20px; }
-
-    .canvas-wrap {
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-    }
+    /* ── Preview ── */
+    .preview-panel { display: flex; flex-direction: column; align-items: center; gap: 18px; position: sticky; top: 20px; }
+    .canvas-wrap { width: 100%; max-width: 430px; box-shadow: 0 8px 40px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.07); border-radius: 2px; overflow: hidden; }
     canvas { display: block; width: 100%; height: auto; }
 
     /* ── Download button ── */
-    .btn-download {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: var(--ink);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      padding: 14px 40px;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      width: 100%;
-      max-width: 420px;
-    }
-    .btn-download:hover { background: #2a2a2a; }
-    .btn-download:active { transform: scale(0.985); }
-    .btn-download svg { flex-shrink: 0; }
-
-    /* ── Divider ── */
-    .divider { height: 1px; background: var(--border); }
+    .btn-dl { display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--ink); color: #fff; border: none; border-radius: var(--r); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; padding: 14px 40px; cursor: pointer; transition: background 0.14s, transform 0.1s; width: 100%; max-width: 430px; }
+    .btn-dl:hover { background: #2a2a2a; }
+    .btn-dl:active { transform: scale(0.988); }
 
     /* ── Responsive ── */
-    @media (max-width: 820px) {
+    @media (max-width: 860px) {
       nav { padding: 0 20px; }
-      .page-header { padding: 32px 20px 24px; }
-      .page-header h1 { font-size: 26px; }
-      .main-grid {
-        grid-template-columns: 1fr;
-        padding: 0 20px 48px;
-        gap: 32px;
-      }
-      .preview-panel { order: -1; }
-      .canvas-wrap { max-width: 340px; }
-      .btn-download { max-width: 340px; }
+      .page-header { padding: 28px 20px 20px; }
+      .main-grid { grid-template-columns: 1fr; padding: 0 20px 48px; gap: 28px; }
+      .preview-panel { order: -1; position: static; }
+      .canvas-wrap, .btn-dl { max-width: 360px; }
     }
     @media (max-width: 480px) {
-      .main-grid { padding: 0 16px 40px; }
-      .canvas-wrap { max-width: 100%; }
-      .btn-download { max-width: 100%; }
+      .main-grid { padding: 0 14px 40px; }
+      .canvas-wrap, .btn-dl { max-width: 100%; }
+      .frame-scroll { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
 
-  <!-- Nav -->
-  <nav>
-    <a href="/">
-      <span class="nav-arrow">←</span>
-      <span>iLoveVideo</span>
-    </a>
-    <span class="nav-brand">Sell Post</span>
-    <span style="width:80px"></span>
-  </nav>
+<nav>
+  <a href="/"><span style="font-size:14px;color:#9ca3af">←</span> iLoveVideo</a>
+  <span class="nav-brand">Sell Post</span>
+  <span style="width:72px"></span>
+</nav>
 
-  <!-- Page header -->
-  <div class="page-header">
-    <h1>Sell Post</h1>
-    <p>Turn product photos into ready-to-post listing cards for WhatsApp Status.</p>
-  </div>
+<div class="page-header">
+  <h1>Sell Post</h1>
+  <p>Turn product photos into ready-to-post listing cards for WhatsApp Status.</p>
+</div>
 
-  <!-- Main -->
-  <div class="main-grid">
+<div class="main-grid">
 
-    <!-- Left: Controls -->
-    <div class="controls">
+  <!-- Controls -->
+  <div class="controls">
 
-      <!-- Upload -->
-      <div class="field-group">
-        <label class="field-label">Product Image</label>
-        <div class="drop-zone" id="dropZone" title="Click or drag to upload">
-          <img class="thumb" id="thumbImg" alt="" />
-          <div class="drop-zone-label">
-            <div class="drop-zone-icon">🖼</div>
-            <div class="drop-zone-text">Drop image here</div>
-            <div class="drop-zone-sub">or click to browse · JPG, PNG, WEBP</div>
-          </div>
-          <span class="drop-zone-change">Change ↑</span>
+    <div class="field-group">
+      <label class="field-label">Product Image</label>
+      <div class="drop-zone" id="dropZone">
+        <img class="thumb" id="thumbImg" alt="" />
+        <div class="drop-zone-label">
+          <div class="drop-zone-icon">🖼</div>
+          <div class="drop-zone-text">Drop image here</div>
+          <div class="drop-zone-sub">or click to browse · JPG, PNG, WEBP</div>
         </div>
-        <input type="file" id="fileInput" accept="image/*" style="display:none" />
+        <span class="drop-change">Change ↑</span>
       </div>
-
-      <div class="divider"></div>
-
-      <!-- Price -->
-      <div class="field-group">
-        <label class="field-label" for="priceInput">Price</label>
-        <input class="field-input" id="priceInput" type="text" placeholder="₦45,000" maxlength="30" />
-      </div>
-
-      <!-- Contact -->
-      <div class="field-group">
-        <label class="field-label" for="contactInput">Contact / Handle</label>
-        <input class="field-input" id="contactInput" type="text" placeholder="@YourBrand or 08012345678" maxlength="40" />
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- Frame Style -->
-      <div class="field-group">
-        <label class="field-label">Frame Style</label>
-        <div class="frame-grid">
-          <div class="frame-card active" data-frame="gold">
-            <div class="frame-thumb frame-thumb-gold"></div>
-            <span class="frame-name">Gold<br>Minimal</span>
-          </div>
-          <div class="frame-card" data-frame="black">
-            <div class="frame-thumb frame-thumb-black"></div>
-            <span class="frame-name">Pitch<br>Black</span>
-          </div>
-          <div class="frame-card" data-frame="white">
-            <div class="frame-thumb frame-thumb-white"></div>
-            <span class="frame-name">Clean<br>White</span>
-          </div>
-        </div>
-      </div>
-
+      <input type="file" id="fileInput" accept="image/*" style="display:none" />
     </div>
 
-    <!-- Right: Preview -->
-    <div class="preview-panel">
-      <div class="canvas-wrap">
-        <canvas id="previewCanvas" width="1080" height="1350"></canvas>
+    <div class="divider"></div>
+
+    <div class="field-group">
+      <label class="field-label" for="priceInput">Price</label>
+      <input class="field-input" id="priceInput" type="text" placeholder="₦45,000" maxlength="30" />
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="contactInput">Contact / Handle</label>
+      <input class="field-input" id="contactInput" type="text" placeholder="@YourBrand or 08012345678" maxlength="40" />
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field-group">
+      <label class="field-label">Frame Style</label>
+      <div class="frame-scroll" id="frameGrid">
+
+        <div class="frame-card active" data-frame="gold-noir">
+          <div class="fthumb ft-gold-noir"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Gold Noir</span>
+        </div>
+        <div class="frame-card" data-frame="pearl">
+          <div class="fthumb ft-pearl"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Pearl White</span>
+        </div>
+        <div class="frame-card" data-frame="midnight">
+          <div class="fthumb ft-midnight"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Midnight</span>
+        </div>
+        <div class="frame-card" data-frame="rose">
+          <div class="fthumb ft-rose"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Rose Petal</span>
+        </div>
+        <div class="frame-card" data-frame="purple">
+          <div class="fthumb ft-purple"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Royal Purple</span>
+        </div>
+        <div class="frame-card" data-frame="ocean">
+          <div class="fthumb ft-ocean"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Deep Ocean</span>
+        </div>
+        <div class="frame-card" data-frame="emerald">
+          <div class="fthumb ft-emerald"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Emerald</span>
+        </div>
+        <div class="frame-card" data-frame="crimson">
+          <div class="fthumb ft-crimson"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Crimson</span>
+        </div>
+        <div class="frame-card" data-frame="sunset">
+          <div class="fthumb ft-sunset"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Sunset Glow</span>
+        </div>
+        <div class="frame-card" data-frame="silver">
+          <div class="fthumb ft-silver"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Silver Chrome</span>
+        </div>
+        <div class="frame-card" data-frame="forest">
+          <div class="fthumb ft-forest"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Forest Night</span>
+        </div>
+        <div class="frame-card" data-frame="neon">
+          <div class="fthumb ft-neon"><div class="fthumb-img"></div><div class="fthumb-bar"></div></div>
+          <span class="frame-name">Neon Pink</span>
+        </div>
+
       </div>
-      <button class="btn-download" id="downloadBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Download JPG
-      </button>
     </div>
 
   </div>
 
-  <script>
-  (function () {
-    'use strict';
+  <!-- Preview -->
+  <div class="preview-panel">
+    <div class="canvas-wrap">
+      <canvas id="previewCanvas" width="1080" height="1350"></canvas>
+    </div>
+    <button class="btn-dl" id="downloadBtn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download JPG
+    </button>
+  </div>
 
-    const canvas   = document.getElementById('previewCanvas');
-    const ctx      = canvas.getContext('2d');
-    const W = 1080, H = 1350;
+</div>
 
-    const dropZone    = document.getElementById('dropZone');
-    const fileInput   = document.getElementById('fileInput');
-    const thumbImg    = document.getElementById('thumbImg');
-    const priceInput  = document.getElementById('priceInput');
-    const contactInput= document.getElementById('contactInput');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const frameCards  = document.querySelectorAll('.frame-card');
+<script>
+(function () {
+  'use strict';
 
-    let uploadedImg = null;
-    let currentFrame = 'gold';
+  const canvas = document.getElementById('previewCanvas');
+  const ctx    = canvas.getContext('2d');
+  const W = 1080, H = 1350;
 
-    // ── Drag & drop ──────────────────────────────────────────────
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file) loadFile(file);
+  const dropZone    = document.getElementById('dropZone');
+  const fileInput   = document.getElementById('fileInput');
+  const thumbImg    = document.getElementById('thumbImg');
+  const priceInput  = document.getElementById('priceInput');
+  const contactInput= document.getElementById('contactInput');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const frameCards  = document.querySelectorAll('.frame-card');
+
+  let img = null;
+  let frame = 'gold-noir';
+
+  // ── Upload ──────────────────────────────────────────────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+  function loadFile(file) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const image = new Image();
+      image.onload = () => { img = image; thumbImg.src = ev.target.result; dropZone.classList.add('has-image'); render(); };
+      image.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Frame selector ───────────────────────────────────────────────
+  frameCards.forEach(card => {
+    card.addEventListener('click', () => {
+      frameCards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      frame = card.dataset.frame;
+      render();
     });
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  priceInput.addEventListener('input',    render);
+  contactInput.addEventListener('input',  render);
+
+  // ── Download ──────────────────────────────────────────────────────
+  downloadBtn.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.download = 'sell-post.jpg';
+    a.href = canvas.toDataURL('image/jpeg', 0.93);
+    a.click();
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function P()  { return priceInput.value.trim()   || '₦0,000'; }
+  function C()  { return contactInput.value.trim() || '@YourBrand'; }
+
+  function drawCover(src, x, y, w, h) {
+    if (!src) { drawPlaceholder(x, y, w, h); return; }
+    const iR = src.width / src.height, rR = w / h;
+    let sx, sy, sw, sh;
+    if (iR > rR) { sh = src.height; sw = rR * sh; sx = (src.width - sw) / 2; sy = 0; }
+    else         { sw = src.width;  sh = sw / rR; sx = 0; sy = (src.height - sh) / 2; }
+    ctx.drawImage(src, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  function drawPlaceholder(x, y, w, h) {
+    ctx.fillStyle = '#2A2824';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#4A4844';
+    ctx.font = '500 26px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Upload your image', x + w / 2, y + h / 2 - 14);
+    ctx.font = '400 19px Inter, sans-serif';
+    ctx.fillStyle = '#3A3830';
+    ctx.fillText('Drop or click to browse', x + w / 2, y + h / 2 + 18);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  function clipDraw(x, y, w, h, fn) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); fn(); ctx.restore();
+  }
+
+  function bottomGrad(x, y, w, h, color) {
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, 'transparent'); g.addColorStop(1, color);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  }
+
+  function rule(x, y, w, color, alpha) {
+    ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillRect(x, y, w, 1.5); ctx.globalAlpha = 1;
+  }
+
+  function dot(x, y, r, color) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  }
+
+  function cornerAccents(x, y, w, h, len, gap, color, lw) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
+    const pts = [
+      [x - gap, y - gap,  1,  1], [x + w + gap, y - gap, -1,  1],
+      [x - gap, y + h + gap, 1, -1], [x + w + gap, y + h + gap, -1, -1],
+    ];
+    pts.forEach(([cx, cy, dx, dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * len, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * len);
+      ctx.stroke();
     });
+  }
 
-    function loadFile(file) {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          uploadedImg = img;
-          thumbImg.src = ev.target.result;
-          dropZone.classList.add('has-image');
-          render();
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
+  function brand(color, align, bx) {
+    ctx.font = '300 19px Inter, sans-serif';
+    ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('ilovevideo.fun', bx, H - 26);
+  }
 
-    // ── Frame selector ───────────────────────────────────────────
-    frameCards.forEach(card => {
-      card.addEventListener('click', () => {
-        frameCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        currentFrame = card.dataset.frame;
-        render();
-      });
-    });
+  function priceLine(text, x, y, color, size, align) {
+    ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+    ctx.font = `700 ${size}px "Playfair Display", Georgia, serif`;
+    ctx.fillStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 2;
+    ctx.fillText(text, x, y);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  }
 
-    // ── Live inputs ───────────────────────────────────────────────
-    priceInput.addEventListener('input',   render);
-    contactInput.addEventListener('input', render);
+  function contactLine(text, x, y, color, align) {
+    ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+    ctx.font = '400 33px Inter, sans-serif';
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
 
-    // ── Download ─────────────────────────────────────────────────
-    downloadBtn.addEventListener('click', () => {
-      const link = document.createElement('a');
-      link.download = 'marketplace-frame.jpg';
-      link.href = canvas.toDataURL('image/jpeg', 0.93);
-      link.click();
-    });
+  // ═══════════════════════════════════════════════════════════════
+  //  FRAME RENDERERS
+  // ═══════════════════════════════════════════════════════════════
 
-    // ── Cover-draw helper ─────────────────────────────────────────
-    function drawCover(img, x, y, w, h) {
-      if (!img) { drawPlaceholder(x, y, w, h); return; }
-      const iR = img.width / img.height;
-      const rR = w / h;
-      let sx, sy, sw, sh;
-      if (iR > rR) {
-        sh = img.height; sw = rR * sh;
-        sx = (img.width - sw) / 2; sy = 0;
-      } else {
-        sw = img.width; sh = sw / rR;
-        sx = 0; sy = (img.height - sh) / 2;
-      }
-      ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
-    }
+  // 1. GOLD NOIR ──────────────────────────────────────────────────
+  function drawGoldNoir() {
+    const PAD = 52, IMG_H = 1066;
+    ctx.fillStyle = '#080706'; ctx.fillRect(0, 0, W, H);
 
-    function drawPlaceholder(x, y, w, h) {
-      ctx.fillStyle = '#ECEAE6';
-      ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = '#B0AFA9';
-      ctx.font = '500 28px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Upload your image', x + w / 2, y + h / 2 - 16);
-      ctx.font = '400 20px Inter, sans-serif';
-      ctx.fillStyle = '#C8C6C0';
-      ctx.fillText('Drop or click to browse', x + w / 2, y + h / 2 + 20);
-      ctx.textBaseline = 'alphabetic';
-    }
+    clipDraw(PAD, PAD, W - PAD*2, IMG_H, () => drawCover(img, PAD, PAD, W - PAD*2, IMG_H));
 
-    // ── Text helpers ──────────────────────────────────────────────
-    function price()   { return priceInput.value.trim()   || '₦0,000'; }
-    function contact() { return contactInput.value.trim() || '@YourBrand'; }
+    // Gold border
+    ctx.strokeStyle = '#C9A84C'; ctx.lineWidth = 2.5;
+    ctx.strokeRect(PAD + 1.5, PAD + 1.5, W - PAD*2 - 3, IMG_H - 3);
 
-    function drawTextShadow(text, x, y, size, font, color, shadowAlpha) {
-      ctx.shadowColor = `rgba(0,0,0,${shadowAlpha})`;
-      ctx.shadowBlur  = 18;
-      ctx.shadowOffsetY = 2;
-      ctx.font      = `${size}px ${font}`;
-      ctx.fillStyle = color;
-      ctx.fillText(text, x, y);
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur  = 0;
-      ctx.shadowOffsetY = 0;
-    }
+    // Corner L-accents
+    cornerAccents(PAD, PAD, W - PAD*2, IMG_H, 34, 10, '#E8C96A', 2);
 
-    // ── FRAME: Gold Minimal ───────────────────────────────────────
-    function drawGold() {
-      const PAD  = 52;   // outer margin
-      const BOTT = 180;  // text bar height at bottom
-      const imgH = H - PAD * 2 - BOTT;
-      const imgW = W - PAD * 2;
+    // Small "FOR SALE" badge
+    ctx.fillStyle = '#C9A84C'; ctx.globalAlpha = 0.15;
+    ctx.fillRect(PAD + 4, PAD + IMG_H + 18, 130, 30); ctx.globalAlpha = 1;
+    ctx.font = '600 14px Inter, sans-serif'; ctx.fillStyle = '#C9A84C';
+    ctx.textAlign = 'left'; ctx.fillText('FOR SALE', PAD + 16, PAD + IMG_H + 39);
 
-      // Dark background
-      ctx.fillStyle = '#0D0B08';
-      ctx.fillRect(0, 0, W, H);
+    const ty = PAD + IMG_H + 74;
+    priceLine(P(), PAD + 4, ty, '#C9A84C', 80, 'left');
+    rule(PAD + 4, ty + 14, 300, '#C9A84C', 0.3);
+    contactLine(C(), PAD + 4, ty + 58, '#7A6840', 'left');
+    brand('#2E2C28', 'right', W - PAD);
+  }
 
-      // Image
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(PAD, PAD, imgW, imgH);
-      ctx.clip();
-      drawCover(uploadedImg, PAD, PAD, imgW, imgH);
-      ctx.restore();
+  // 2. PEARL WHITE ────────────────────────────────────────────────
+  function drawPearl() {
+    const SIDE = 62, TOP = 56, IMG_H = 1016;
+    ctx.fillStyle = '#F8F7F3'; ctx.fillRect(0, 0, W, H);
 
-      // Gold hairline border around image
-      ctx.strokeStyle = '#C9A84C';
-      ctx.lineWidth   = 3;
-      ctx.strokeRect(PAD + 1.5, PAD + 1.5, imgW - 3, imgH - 3);
+    clipDraw(SIDE, TOP, W - SIDE*2, IMG_H, () => drawCover(img, SIDE, TOP, W - SIDE*2, IMG_H));
 
-      // Corner accents (gold L-brackets)
-      const CL = 30; // corner line length
-      const CM = 10; // corner margin inside border
-      ctx.strokeStyle = '#E8C96A';
-      ctx.lineWidth   = 2;
-      const corners = [
-        [PAD - CM,        PAD - CM,         1,  1],
-        [PAD + imgW + CM, PAD - CM,        -1,  1],
-        [PAD - CM,        PAD + imgH + CM,  1, -1],
-        [PAD + imgW + CM, PAD + imgH + CM, -1, -1],
-      ];
-      corners.forEach(([cx, cy, dx, dy]) => {
-        ctx.beginPath();
-        ctx.moveTo(cx + dx * CL, cy);
-        ctx.lineTo(cx, cy);
-        ctx.lineTo(cx, cy + dy * CL);
-        ctx.stroke();
-      });
+    ctx.strokeStyle = '#D8D6D0'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(SIDE, TOP, W - SIDE*2, IMG_H);
 
-      // Bottom text area
-      const textY = PAD + imgH + 38;
+    const ty = TOP + IMG_H + 30;
+    // Price label
+    ctx.font = '500 13px Inter, sans-serif'; ctx.fillStyle = '#AAAAAA';
+    ctx.textAlign = 'left'; ctx.fillText('PRICE', SIDE, ty + 2);
 
-      // Price
-      ctx.textAlign    = 'left';
-      ctx.textBaseline = 'alphabetic';
-      drawTextShadow(price(), PAD + 4, textY + 54, 76, '"Playfair Display", Georgia, serif', '#C9A84C', 0.5);
+    priceLine(P(), SIDE, ty + 58, '#111111', 80, 'left');
+    rule(SIDE, ty + 70, W - SIDE*2, '#CCC', 0.8);
+    contactLine(C(), SIDE, ty + 112, '#888680', 'left');
+    brand('#BDBBB5', 'right', W - SIDE);
+  }
 
-      // Thin gold rule under price
-      ctx.fillStyle = '#C9A84C';
-      ctx.globalAlpha = 0.35;
-      ctx.fillRect(PAD + 4, textY + 66, 280, 1.5);
-      ctx.globalAlpha = 1;
+  // 3. MIDNIGHT ───────────────────────────────────────────────────
+  function drawMidnight() {
+    const IMG_H = 1070, BAR = H - IMG_H;
+    clipDraw(0, 0, W, IMG_H, () => drawCover(img, 0, 0, W, IMG_H));
 
-      // Contact
-      ctx.font      = '400 32px Inter, sans-serif';
-      ctx.fillStyle = '#8A8070';
-      ctx.fillText(contact(), PAD + 4, textY + 108);
+    // Subtle vignette at bottom of image
+    bottomGrad(0, IMG_H - 180, W, 180, 'rgba(0,0,0,0.55)');
 
-      // Branding
-      ctx.font      = '300 20px Inter, sans-serif';
-      ctx.fillStyle = '#3A3830';
-      ctx.textAlign = 'right';
-      ctx.fillText('ilovevideo.fun', W - PAD, H - 24);
-    }
+    ctx.fillStyle = '#000'; ctx.fillRect(0, IMG_H, W, BAR);
+    rule(0, IMG_H, W, '#fff', 0.07);
 
-    // ── FRAME: Pitch Black ────────────────────────────────────────
-    function drawBlack() {
-      const BAR_H = 240;
-      const imgH  = H - BAR_H;
+    const mid = IMG_H + BAR / 2;
+    priceLine(P(), W/2, mid - 20, '#FFFFFF', 86, 'center');
+    dot(W/2, mid + 8, 3.5, '#C9A84C');
+    contactLine(C(), W/2, mid + 52, '#777', 'center');
+    brand('#333', 'center', W/2);
+  }
 
-      // Image fills top
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, W, imgH);
-      ctx.clip();
-      drawCover(uploadedImg, 0, 0, W, imgH);
-      ctx.restore();
+  // 4. ROSE PETAL ─────────────────────────────────────────────────
+  function drawRose() {
+    const PAD = 50, IMG_H = 1068;
+    ctx.fillStyle = '#130A09'; ctx.fillRect(0, 0, W, H);
 
-      // Black bar
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, imgH, W, BAR_H);
+    clipDraw(PAD, PAD, W - PAD*2, IMG_H, () => drawCover(img, PAD, PAD, W - PAD*2, IMG_H));
 
-      // Thin white separator
-      ctx.fillStyle = '#fff';
-      ctx.globalAlpha = 0.08;
-      ctx.fillRect(0, imgH, W, 1);
-      ctx.globalAlpha = 1;
+    // Warm gradient at bottom of image
+    const g = ctx.createLinearGradient(0, PAD + IMG_H - 200, 0, PAD + IMG_H);
+    g.addColorStop(0, 'transparent'); g.addColorStop(1, 'rgba(80,20,14,0.7)');
+    ctx.fillStyle = g; ctx.fillRect(PAD, PAD + IMG_H - 200, W - PAD*2, 200);
 
-      // Price — centered, white
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'alphabetic';
-      drawTextShadow(price(), W / 2, imgH + 102, 84, '"Playfair Display", Georgia, serif', '#FFFFFF', 0);
+    ctx.strokeStyle = '#C47A6A'; ctx.lineWidth = 2;
+    ctx.strokeRect(PAD + 1, PAD + 1, W - PAD*2 - 2, IMG_H - 2);
 
-      // Gold accent dot
-      ctx.beginPath();
-      ctx.arc(W / 2, imgH + 128, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#C9A84C';
-      ctx.fill();
+    const ty = PAD + IMG_H + 22;
+    ctx.font = '300 13px Inter, sans-serif'; ctx.fillStyle = '#6A3028'; ctx.textAlign = 'left';
+    ctx.fillText('✦  LISTING', PAD + 4, ty + 14);
 
-      // Contact — centered, muted
-      ctx.font      = '400 36px Inter, sans-serif';
-      ctx.fillStyle = '#707070';
-      ctx.fillText(contact(), W / 2, imgH + 176);
+    priceLine(P(), PAD + 4, ty + 70, '#F0B4A8', 78, 'left');
+    rule(PAD + 4, ty + 82, 260, '#C47A6A', 0.4);
+    contactLine(C(), PAD + 4, ty + 124, '#7A4038', 'left');
+    brand('#3A1810', 'right', W - PAD);
+  }
 
-      // Branding
-      ctx.font      = '300 20px Inter, sans-serif';
-      ctx.fillStyle = '#333';
-      ctx.fillText('ilovevideo.fun', W / 2, imgH + BAR_H - 24);
-    }
+  // 5. ROYAL PURPLE ───────────────────────────────────────────────
+  function drawPurple() {
+    const IMG_H = 1072, BAR = H - IMG_H;
+    clipDraw(0, 0, W, IMG_H, () => drawCover(img, 0, 0, W, IMG_H));
 
-    // ── FRAME: Clean White ────────────────────────────────────────
-    function drawWhite() {
-      const SIDE = 60;
-      const TOP  = 60;
-      const BOTT = 260;
-      const imgW = W - SIDE * 2;
-      const imgH = H - TOP - BOTT;
+    // Dual-tone gradient
+    const g = ctx.createLinearGradient(0, IMG_H - 260, 0, IMG_H);
+    g.addColorStop(0, 'transparent'); g.addColorStop(1, 'rgba(18,8,32,0.88)');
+    ctx.fillStyle = g; ctx.fillRect(0, IMG_H - 260, W, 260);
 
-      // Warm white background
-      ctx.fillStyle = '#F8F7F3';
-      ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#0C0815'; ctx.fillRect(0, IMG_H, W, BAR);
 
-      // Subtle inner shadow on image for depth
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(SIDE, TOP, imgW, imgH);
-      ctx.clip();
-      drawCover(uploadedImg, SIDE, TOP, imgW, imgH);
-      ctx.restore();
+    // Purple shimmer line
+    const sg = ctx.createLinearGradient(0, 0, W, 0);
+    sg.addColorStop(0, 'transparent'); sg.addColorStop(0.3, '#7C3AED'); sg.addColorStop(0.7, '#A78BFA'); sg.addColorStop(1, 'transparent');
+    ctx.fillStyle = sg; ctx.globalAlpha = 0.6; ctx.fillRect(0, IMG_H, W, 1.5); ctx.globalAlpha = 1;
 
-      // Very thin border around image
-      ctx.strokeStyle = '#D8D6D0';
-      ctx.lineWidth   = 1.5;
-      ctx.strokeRect(SIDE, TOP, imgW, imgH);
+    const mid = IMG_H + BAR / 2;
+    priceLine(P(), W/2, mid - 18, '#D4C8F0', 84, 'center');
+    rule(W/2 - 100, mid + 4, 200, '#7C3AED', 0.5);
+    contactLine(C(), W/2, mid + 52, '#6050A0', 'center');
+    brand('#2A1A45', 'center', W/2);
+  }
 
-      // Text area
-      const textY = TOP + imgH;
+  // 6. DEEP OCEAN ─────────────────────────────────────────────────
+  function drawOcean() {
+    const IMG_H = 1072, BAR = H - IMG_H;
+    clipDraw(0, 0, W, IMG_H, () => drawCover(img, 0, 0, W, IMG_H));
 
-      // Thin rule
-      ctx.fillStyle = '#DDDBD6';
-      ctx.fillRect(SIDE, textY + 42, W - SIDE * 2, 1);
+    bottomGrad(0, IMG_H - 220, W, 220, 'rgba(5,24,40,0.85)');
 
-      // Price
-      ctx.textAlign    = 'left';
-      ctx.textBaseline = 'alphabetic';
-      ctx.font         = '700 76px "Playfair Display", Georgia, serif';
-      ctx.fillStyle    = '#111111';
-      ctx.shadowColor  = 'transparent';
-      ctx.fillText(price(), SIDE, textY + 36);
+    ctx.fillStyle = '#051828'; ctx.fillRect(0, IMG_H, W, BAR);
 
-      // Contact
-      ctx.font      = '400 34px Inter, sans-serif';
-      ctx.fillStyle = '#888680';
-      ctx.fillText(contact(), SIDE, textY + 104);
+    // Electric blue accent line
+    const og = ctx.createLinearGradient(0, 0, W, 0);
+    og.addColorStop(0, 'transparent'); og.addColorStop(0.25, '#1E40AF'); og.addColorStop(0.75, '#0EA5E9'); og.addColorStop(1, 'transparent');
+    ctx.fillStyle = og; ctx.globalAlpha = 0.8; ctx.fillRect(0, IMG_H, W, 2); ctx.globalAlpha = 1;
 
-      // Branding
-      ctx.font      = '300 20px Inter, sans-serif';
-      ctx.fillStyle = '#BDBBB5';
-      ctx.textAlign = 'right';
-      ctx.fillText('ilovevideo.fun', W - SIDE, H - 28);
-    }
+    const mid = IMG_H + BAR / 2;
+    priceLine(P(), W/2, mid - 18, '#7DD3FC', 84, 'center');
+    dot(W/2, mid + 10, 3, '#0EA5E9');
+    contactLine(C(), W/2, mid + 54, '#2563EB', 'center');
+    brand('#0F2844', 'center', W/2);
+  }
 
-    // ── Main render ───────────────────────────────────────────────
-    function render() {
-      ctx.clearRect(0, 0, W, H);
-      if      (currentFrame === 'gold')  drawGold();
-      else if (currentFrame === 'black') drawBlack();
-      else if (currentFrame === 'white') drawWhite();
-    }
+  // 7. EMERALD ────────────────────────────────────────────────────
+  function drawEmerald() {
+    const PAD = 52, IMG_H = 1064;
+    ctx.fillStyle = '#060F08'; ctx.fillRect(0, 0, W, H);
 
-    // Wait for fonts, then draw
-    document.fonts.ready.then(() => render());
+    clipDraw(PAD, PAD, W - PAD*2, IMG_H, () => drawCover(img, PAD, PAD, W - PAD*2, IMG_H));
 
-  }());
-  </script>
+    // Double border
+    ctx.strokeStyle = 'rgba(16,185,129,0.25)'; ctx.lineWidth = 1;
+    ctx.strokeRect(PAD - 10, PAD - 10, W - PAD*2 + 20, IMG_H + 20);
+    ctx.strokeStyle = '#10B981'; ctx.lineWidth = 2;
+    ctx.strokeRect(PAD + 1, PAD + 1, W - PAD*2 - 2, IMG_H - 2);
+
+    cornerAccents(PAD, PAD, W - PAD*2, IMG_H, 28, 8, '#6EE7B7', 1.5);
+
+    const ty = PAD + IMG_H + 26;
+    ctx.font = '300 12px Inter, sans-serif'; ctx.fillStyle = '#1A4A30';
+    ctx.textAlign = 'left'; ctx.fillText('● AVAILABLE NOW', PAD + 4, ty + 10);
+
+    priceLine(P(), PAD + 4, ty + 68, '#6EE7B7', 78, 'left');
+    rule(PAD + 4, ty + 80, 260, '#10B981', 0.35);
+    contactLine(C(), PAD + 4, ty + 122, '#065F46', 'left');
+    brand('#0A2A18', 'right', W - PAD);
+  }
+
+  // 8. CRIMSON ────────────────────────────────────────────────────
+  function drawCrimson() {
+    const IMG_H = 1072, BAR = H - IMG_H;
+    clipDraw(0, 0, W, IMG_H, () => drawCover(img, 0, 0, W, IMG_H));
+
+    bottomGrad(0, IMG_H - 240, W, 240, 'rgba(15,2,5,0.9)');
+
+    ctx.fillStyle = '#0F0205'; ctx.fillRect(0, IMG_H, W, BAR);
+
+    const rg = ctx.createLinearGradient(0, 0, W, 0);
+    rg.addColorStop(0, 'transparent'); rg.addColorStop(0.35, '#9B1C1C'); rg.addColorStop(0.65, '#DC2626'); rg.addColorStop(1, 'transparent');
+    ctx.fillStyle = rg; ctx.globalAlpha = 0.7; ctx.fillRect(0, IMG_H, W, 2); ctx.globalAlpha = 1;
+
+    const mid = IMG_H + BAR / 2;
+    priceLine(P(), W/2, mid - 18, '#FECACA', 84, 'center');
+    rule(W/2 - 80, mid + 4, 160, '#DC2626', 0.6);
+    contactLine(C(), W/2, mid + 52, '#991B1B', 'center');
+    brand('#2A0508', 'center', W/2);
+  }
+
+  // 9. SUNSET GLOW ────────────────────────────────────────────────
+  function drawSunset() {
+    const PAD = 50, IMG_H = 1066;
+    ctx.fillStyle = '#100800'; ctx.fillRect(0, 0, W, H);
+
+    clipDraw(PAD, PAD, W - PAD*2, IMG_H, () => drawCover(img, PAD, PAD, W - PAD*2, IMG_H));
+
+    // Warm amber vignette at base
+    const sg = ctx.createLinearGradient(0, PAD + IMG_H - 160, 0, PAD + IMG_H);
+    sg.addColorStop(0, 'transparent'); sg.addColorStop(1, 'rgba(60,20,0,0.65)');
+    ctx.fillStyle = sg; ctx.fillRect(PAD, PAD + IMG_H - 160, W - PAD*2, 160);
+
+    ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 2;
+    ctx.strokeRect(PAD + 1, PAD + 1, W - PAD*2 - 2, IMG_H - 2);
+
+    // Warm shimmer top edge
+    const tg = ctx.createLinearGradient(PAD, 0, PAD + W - PAD*2, 0);
+    tg.addColorStop(0, 'transparent'); tg.addColorStop(0.4, '#FCD34D'); tg.addColorStop(0.6, '#F59E0B'); tg.addColorStop(1, 'transparent');
+    ctx.fillStyle = tg; ctx.globalAlpha = 0.5; ctx.fillRect(PAD, PAD + 1, W - PAD*2, 2); ctx.globalAlpha = 1;
+
+    const ty = PAD + IMG_H + 28;
+    ctx.font = '300 13px Inter, sans-serif'; ctx.fillStyle = '#5C3000'; ctx.textAlign = 'left';
+    ctx.fillText('✦  PRICE', PAD + 4, ty + 10);
+
+    priceLine(P(), PAD + 4, ty + 68, '#FCD34D', 78, 'left');
+    rule(PAD + 4, ty + 80, 240, '#F59E0B', 0.4);
+    contactLine(C(), PAD + 4, ty + 122, '#78350F', 'left');
+    brand('#301800', 'right', W - PAD);
+  }
+
+  // 10. SILVER CHROME ─────────────────────────────────────────────
+  function drawSilver() {
+    const SIDE = 62, TOP = 56, IMG_H = 1016;
+    ctx.fillStyle = '#F0EEE8'; ctx.fillRect(0, 0, W, H);
+
+    // Subtle outer shadow for depth
+    const sdg = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.75);
+    sdg.addColorStop(0, 'transparent'); sdg.addColorStop(1, 'rgba(0,0,0,0.04)');
+    ctx.fillStyle = sdg; ctx.fillRect(0, 0, W, H);
+
+    clipDraw(SIDE, TOP, W - SIDE*2, IMG_H, () => drawCover(img, SIDE, TOP, W - SIDE*2, IMG_H));
+
+    // Silver double border
+    ctx.strokeStyle = '#C8C6C0'; ctx.lineWidth = 1;
+    ctx.strokeRect(SIDE - 6, TOP - 6, W - SIDE*2 + 12, IMG_H + 12);
+    ctx.strokeStyle = '#DDDBD6'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(SIDE, TOP, W - SIDE*2, IMG_H);
+
+    const ty = TOP + IMG_H + 32;
+    ctx.font = '300 12px Inter, sans-serif'; ctx.fillStyle = '#AAAAAA'; ctx.textAlign = 'left';
+    ctx.fillText('PRICE', SIDE, ty + 2);
+
+    priceLine(P(), SIDE, ty + 58, '#1A1A1A', 80, 'left');
+    rule(SIDE, ty + 70, W - SIDE*2, '#C0BEB8', 1);
+    contactLine(C(), SIDE, ty + 112, '#808080', 'left');
+    brand('#C0BEB8', 'right', W - SIDE);
+  }
+
+  // 11. FOREST NIGHT ──────────────────────────────────────────────
+  function drawForest() {
+    const PAD = 52, IMG_H = 1064;
+    ctx.fillStyle = '#060C06'; ctx.fillRect(0, 0, W, H);
+
+    clipDraw(PAD, PAD, W - PAD*2, IMG_H, () => drawCover(img, PAD, PAD, W - PAD*2, IMG_H));
+
+    // Outer dim border
+    ctx.strokeStyle = 'rgba(74,122,53,0.3)'; ctx.lineWidth = 1;
+    ctx.strokeRect(PAD - 9, PAD - 9, W - PAD*2 + 18, IMG_H + 18);
+    // Inner accent border
+    ctx.strokeStyle = '#4A7A35'; ctx.lineWidth = 2;
+    ctx.strokeRect(PAD + 1, PAD + 1, W - PAD*2 - 2, IMG_H - 2);
+
+    cornerAccents(PAD, PAD, W - PAD*2, IMG_H, 26, 7, '#A3C98A', 1.5);
+
+    const ty = PAD + IMG_H + 26;
+    ctx.font = '300 12px Inter, sans-serif'; ctx.fillStyle = '#2A4A1A'; ctx.textAlign = 'left';
+    ctx.fillText('◆ LISTING', PAD + 4, ty + 10);
+
+    priceLine(P(), PAD + 4, ty + 68, '#A3C98A', 78, 'left');
+    rule(PAD + 4, ty + 80, 250, '#4A7A35', 0.4);
+    contactLine(C(), PAD + 4, ty + 122, '#2A5020', 'left');
+    brand('#0E1E0A', 'right', W - PAD);
+  }
+
+  // 12. NEON PINK ─────────────────────────────────────────────────
+  function drawNeon() {
+    const IMG_H = 1072, BAR = H - IMG_H;
+    clipDraw(0, 0, W, IMG_H, () => drawCover(img, 0, 0, W, IMG_H));
+
+    bottomGrad(0, IMG_H - 200, W, 200, 'rgba(8,7,15,0.88)');
+
+    ctx.fillStyle = '#08070F'; ctx.fillRect(0, IMG_H, W, BAR);
+
+    // Neon pink accent bar
+    const ng = ctx.createLinearGradient(0, 0, W, 0);
+    ng.addColorStop(0, 'transparent'); ng.addColorStop(0.2, '#FF69B4'); ng.addColorStop(0.5, '#FF1493'); ng.addColorStop(0.8, '#FF69B4'); ng.addColorStop(1, 'transparent');
+    ctx.fillStyle = ng; ctx.globalAlpha = 0.85; ctx.fillRect(0, IMG_H, W, 2.5); ctx.globalAlpha = 1;
+
+    // Soft neon glow behind price
+    const glow = ctx.createRadialGradient(W/2, IMG_H + 120, 0, W/2, IMG_H + 120, 280);
+    glow.addColorStop(0, 'rgba(255,20,147,0.08)'); glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow; ctx.fillRect(0, IMG_H, W, BAR);
+
+    const mid = IMG_H + BAR / 2;
+    priceLine(P(), W/2, mid - 18, '#FF69B4', 84, 'center');
+    dot(W/2, mid + 10, 3.5, '#FF1493');
+    contactLine(C(), W/2, mid + 54, '#7A3060', 'center');
+    brand('#2A1830', 'center', W/2);
+  }
+
+  // ── Router ───────────────────────────────────────────────────────
+  const RENDERERS = {
+    'gold-noir': drawGoldNoir, 'pearl': drawPearl,   'midnight': drawMidnight,
+    'rose':      drawRose,     'purple': drawPurple,  'ocean':    drawOcean,
+    'emerald':   drawEmerald,  'crimson': drawCrimson,'sunset':   drawSunset,
+    'silver':    drawSilver,   'forest': drawForest,  'neon':     drawNeon,
+  };
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    (RENDERERS[frame] || drawGoldNoir)();
+  }
+
+  document.fonts.ready.then(() => render());
+
+}());
+</script>
 </body>
 </html>
