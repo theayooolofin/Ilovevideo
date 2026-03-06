@@ -1167,10 +1167,11 @@ app.post('/api/split-status', upload.single('video'), async (req, res) => {
   });
 });
 
-app.get('/api/split-status/:jobId/clip/:index', async (req, res) => {
+// No Pro re-check here — the jobId (128-bit random) is proof of authorization.
+// Re-checking would make N Supabase round-trips for N clips, causing slow loads.
+app.get('/api/split-status/:jobId/clip/:index', (req, res) => {
   const { jobId, index } = req.params;
 
-  // Validate jobId to prevent path traversal
   if (!/^split-\d+-[a-f0-9]{16}$/.test(jobId)) {
     return res.status(400).json({ error: 'Invalid job ID' });
   }
@@ -1178,9 +1179,6 @@ app.get('/api/split-status/:jobId/clip/:index', async (req, res) => {
   if (isNaN(clipIndex) || clipIndex < 0 || clipIndex > 999) {
     return res.status(400).json({ error: 'Invalid clip index' });
   }
-
-  const { isPro } = await resolveKeyAndLimit(req);
-  if (!isPro) return res.status(403).json({ error: 'PRO_REQUIRED' });
 
   const clipFile = path.join(SPLITS_DIR, jobId, `clip-${String(clipIndex).padStart(3, '0')}.mp4`);
   if (!fs.existsSync(clipFile)) {

@@ -1259,11 +1259,10 @@ function App() {
       const { jobId, count, clips } = await response.json()
       setSplitProcessing(false)
       setSplitResult({ jobId, count, clips: clips.map(c => ({ ...c, fetching: true, url: null })) })
-      // Fetch each clip sequentially from the server
-      for (let i = 0; i < clips.length; i++) {
+      // Fetch all clips in parallel — no Pro re-check on server, just serve by jobId
+      await Promise.all(clips.map(async (clip, i) => {
         try {
-          const clipHeaders = await getAuthHeaders()
-          const clipRes = await fetch(`${API_URL}/api/split-status/${jobId}/clip/${clips[i].index}`, { headers: clipHeaders })
+          const clipRes = await fetch(`${API_URL}/api/split-status/${jobId}/clip/${clip.index}`, { mode: 'cors' })
           if (!clipRes.ok) throw new Error('Failed')
           const blob = await clipRes.blob()
           const url = URL.createObjectURL(blob)
@@ -1281,7 +1280,7 @@ function App() {
             return { ...prev, clips: updated }
           })
         }
-      }
+      }))
       await postStats('video', 0)
       fetchUsage()
     } catch (err) {
