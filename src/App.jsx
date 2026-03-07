@@ -712,7 +712,7 @@ function App() {
     event.preventDefault()
     setIsDropActive(false)
     const [file] = event.dataTransfer?.files || []
-    if (file) handleIncomingFile(file)
+    if (file) { warnIfLarge(file); handleIncomingFile(file) }
   }
 
   const handleCompress = async () => {
