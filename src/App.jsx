@@ -178,6 +178,7 @@ function App() {
   const [progress, setProgress] = useState(0)
   const [statusMessage, setStatusMessage] = useState('Upload a file to begin.')
   const [errorMessage, setErrorMessage] = useState('')
+  const [largeFileWarn, setLargeFileWarn] = useState('')
   const [result, setResult] = useState(null)
   const [isDropActive, setIsDropActive] = useState(false)
   const [usageCount, setUsageCount] = useState(0)
@@ -681,9 +682,19 @@ function App() {
     setStatusMessage(`Selected: ${file.name}`)
   }
 
+  const warnIfLarge = (file) => {
+    const MB = file.size / (1024 * 1024)
+    if (MB > 100) {
+      const mb = Math.round(MB)
+      setLargeFileWarn(`Your file is ${mb} MB — large files take longer to upload and process. For the best experience, use a PC on a stable Wi-Fi connection and keep this tab open until it finishes.`)
+      const t = setTimeout(() => setLargeFileWarn(''), 10000)
+      return () => clearTimeout(t)
+    }
+  }
+
   const handleFileChange = (event) => {
     const [file] = event.target.files || []
-    if (file) handleIncomingFile(file)
+    if (file) { warnIfLarge(file); handleIncomingFile(file) }
     event.target.value = ''
   }
 
@@ -1698,6 +1709,18 @@ function App() {
         </div>
       </section>
 
+      {/* ── Large-file warning toast ── */}
+      {largeFileWarn && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, maxWidth: '520px', width: 'calc(100% - 32px)', background: '#1c1409', border: '1px solid #92400e', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
+          <span style={{ fontSize: '20px', flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '13px', fontWeight: '600', color: '#fcd34d', marginBottom: '3px' }}>Large file detected</p>
+            <p style={{ fontSize: '12.5px', color: '#d97706', lineHeight: '1.5' }}>{largeFileWarn}</p>
+          </div>
+          <button onClick={() => setLargeFileWarn('')} style={{ background: 'none', border: 'none', color: '#92400e', fontSize: '18px', cursor: 'pointer', flexShrink: 0, padding: '0 2px', lineHeight: 1 }}>✕</button>
+        </div>
+      )}
+
       {/* ── Tool Tabs ── */}
       <div className="tabs-wrap">
         <div className="tabs-shell">
@@ -2412,7 +2435,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="audio-input" className={`upload-zone${audioFile ? ' has-file' : ''}`}>
                           <input id="audio-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setAudioFile(f); setAudioResult(null); setAudioError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setAudioFile(f); setAudioResult(null); setAudioError('') }; e.target.value = '' }} />
                           <div className="upload-icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
@@ -2492,7 +2515,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="gif-input" className={`upload-zone${gifFile ? ' has-file' : ''}`}>
                           <input id="gif-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setGifFile(f); setGifResult(null); setGifError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setGifFile(f); setGifResult(null); setGifError('') }; e.target.value = '' }} />
                           <div className="upload-icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
@@ -2592,7 +2615,7 @@ function App() {
                     <span className="field-label">Upload Video</span>
                     <label htmlFor="remove-audio-input" className={`upload-zone${removeAudioFile ? ' has-file' : ''}`}>
                       <input id="remove-audio-input" type="file" accept="video/*" className="sr-only"
-                        onChange={e => { const f = e.target.files?.[0]; if (f) { setRemoveAudioFile(f); setRemoveAudioResult(null); setRemoveAudioError('') }; e.target.value = '' }} />
+                        onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setRemoveAudioFile(f); setRemoveAudioResult(null); setRemoveAudioError('') }; e.target.value = '' }} />
                       <div className="upload-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                           <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
@@ -2671,7 +2694,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="trim-input" className={`upload-zone${trimFile ? ' has-file' : ''}`}>
                           <input id="trim-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setTrimFile(f); setTrimResult(null); setTrimError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setTrimFile(f); setTrimResult(null); setTrimError('') }; e.target.value = '' }} />
                           <div className="upload-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
@@ -2769,7 +2792,7 @@ function App() {
                           <span className="field-label">Upload Video</span>
                           <label htmlFor="wm-video-input" className={`upload-zone${watermarkVideoFile ? ' has-file' : ''}`} style={{ minHeight: '100px' }}>
                             <input id="wm-video-input" type="file" accept="video/*" className="sr-only"
-                              onChange={e => { const f = e.target.files?.[0]; if (f) { setWatermarkVideoFile(f); setWatermarkResult(null); setWatermarkError('') }; e.target.value = '' }} />
+                              onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setWatermarkVideoFile(f); setWatermarkResult(null); setWatermarkError('') }; e.target.value = '' }} />
                             {watermarkVideoFile ? (
                               <p className="upload-title" style={{ color: '#065f46', fontSize: '12px' }}>{watermarkVideoFile.name}</p>
                             ) : (
@@ -2881,7 +2904,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="speed-input" className={`upload-zone${speedFile ? ' has-file' : ''}`}>
                           <input id="speed-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setSpeedFile(f); setSpeedResult(null); setSpeedError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setSpeedFile(f); setSpeedResult(null); setSpeedError('') }; e.target.value = '' }} />
                           <div className="upload-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
@@ -2990,7 +3013,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="cartoon-input" className={`upload-zone${cartoonFile ? ' has-file' : ''}`}>
                           <input id="cartoon-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setCartoonFile(f); setCartoonResult(null); setCartoonError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setCartoonFile(f); setCartoonResult(null); setCartoonError('') }; e.target.value = '' }} />
                           <div className="upload-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.632-8.664 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" strokeLinecap="round" strokeLinejoin="round" />
@@ -3103,7 +3126,7 @@ function App() {
                         <span className="field-label">Upload Video</span>
                         <label htmlFor="split-input" className={`upload-zone${splitFile ? ' has-file' : ''}`}>
                           <input id="split-input" type="file" accept="video/*" className="sr-only"
-                            onChange={e => { const f = e.target.files?.[0]; if (f) { setSplitFile(f); setSplitResult(null); setSplitError('') }; e.target.value = '' }} />
+                            onChange={e => { const f = e.target.files?.[0]; if (f) { warnIfLarge(f); setSplitFile(f); setSplitResult(null); setSplitError('') }; e.target.value = '' }} />
                           <div className="upload-icon-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.338-2.32 5.25 5.25 0 0 1 1.605 8.344 4.5 4.5 0 0 1-1.283 1.009" strokeLinecap="round" strokeLinejoin="round" />
